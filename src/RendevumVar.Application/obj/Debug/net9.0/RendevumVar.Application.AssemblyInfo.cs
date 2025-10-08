@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("RendevumVar.Application")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6eae1ad71001f395b0f476509ab6aa7f62f01cbd")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d37b4d8a5a9e39aa112e19e4a4f97e044660ae6a")]
 [assembly: System.Reflection.AssemblyProductAttribute("RendevumVar.Application")]
 [assembly: System.Reflection.AssemblyTitleAttribute("RendevumVar.Application")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
