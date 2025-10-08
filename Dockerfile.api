@@ -1,0 +1,25 @@
+# Backend Dockerfile
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
+WORKDIR /app
+EXPOSE 80
+EXPOSE 443
+
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+COPY ["src/RendevumVar.API/RendevumVar.API.csproj", "RendevumVar.API/"]
+COPY ["src/RendevumVar.Application/RendevumVar.Application.csproj", "RendevumVar.Application/"]
+COPY ["src/RendevumVar.Infrastructure/RendevumVar.Infrastructure.csproj", "RendevumVar.Infrastructure/"]
+COPY ["src/RendevumVar.Core/RendevumVar.Core.csproj", "RendevumVar.Core/"]
+
+RUN dotnet restore "RendevumVar.API/RendevumVar.API.csproj"
+COPY src/ .
+WORKDIR "/src/RendevumVar.API"
+RUN dotnet build "RendevumVar.API.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "RendevumVar.API.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "RendevumVar.API.dll"]

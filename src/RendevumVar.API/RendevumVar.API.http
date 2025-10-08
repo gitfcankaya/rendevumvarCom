@@ -1,0 +1,6 @@
+@RendevumVar.API_HostAddress = http://localhost:5273
+
+GET {{RendevumVar.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
