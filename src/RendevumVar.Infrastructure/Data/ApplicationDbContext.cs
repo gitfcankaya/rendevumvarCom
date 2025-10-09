@@ -301,12 +301,13 @@ public class ApplicationDbContext : DbContext
 
         // Add check constraints
         modelBuilder.Entity<Review>()
-            .HasCheckConstraint("CK_Review_Rating", "Rating >= 1 AND Rating <= 5");
+            .ToTable(t => t.HasCheckConstraint("CK_Review_Rating", "Rating >= 1 AND Rating <= 5"));
 
         modelBuilder.Entity<Service>()
-            .HasCheckConstraint("CK_Service_Duration", "DurationMinutes > 0");
-
-        modelBuilder.Entity<Service>()
-            .HasCheckConstraint("CK_Service_Price", "Price >= 0");
+            .ToTable(t => 
+            {
+                t.HasCheckConstraint("CK_Service_Duration", "DurationMinutes > 0");
+                t.HasCheckConstraint("CK_Service_Price", "Price >= 0");
+            });
     }
 }

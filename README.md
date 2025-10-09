@@ -160,6 +160,20 @@ npm run dev
 
 The frontend will be available at `http://localhost:5173`
 
+## 🚀 Deployment
+
+For production deployment instructions (Docker, Azure, manual), see [DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+**Quick Docker Deployment:**
+```bash
+docker-compose up -d
+```
+
+This will start:
+- SQL Server (port 1433)
+- Backend API (port 5000)
+- Frontend (port 3000)
+
 ## 📚 API Documentation
 
 Once the API is running, access the Swagger documentation at:
