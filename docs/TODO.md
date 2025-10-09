@@ -5,52 +5,52 @@
 ### Phase 1: Project Initialization (Week 1)
 
 #### Backend Setup
-- [ ] Create .NET Core 8.0 solution
-  - [ ] Create API project (RendevumVar.API)
-  - [ ] Create Core project (RendevumVar.Core) - Domain layer
-  - [ ] Create Infrastructure project (RendevumVar.Infrastructure) - Data access
-  - [ ] Create Application project (RendevumVar.Application) - Business logic
+- [x] Create .NET Core 9.0 solution
+  - [x] Create API project (RendevumVar.API)
+  - [x] Create Core project (RendevumVar.Core) - Domain layer
+  - [x] Create Infrastructure project (RendevumVar.Infrastructure) - Data access
+  - [x] Create Application project (RendevumVar.Application) - Business logic
   - [ ] Create Tests project (RendevumVar.Tests)
-- [ ] Install NuGet packages
-  - [ ] Entity Framework Core + SQL Server provider
-  - [ ] AutoMapper
-  - [ ] FluentValidation
+- [x] Install NuGet packages
+  - [x] Entity Framework Core + SQL Server provider
+  - [x] AutoMapper
+  - [x] FluentValidation
   - [ ] Serilog
-  - [ ] Swashbuckle (Swagger)
-  - [ ] JWT Authentication packages
+  - [x] Swashbuckle (Swagger)
+  - [x] JWT Authentication packages
   - [ ] xUnit, Moq for testing
-- [ ] Configure project structure and dependencies
-- [ ] Set up appsettings.json with connection strings
-- [ ] Configure Swagger/OpenAPI documentation
+- [x] Configure project structure and dependencies
+- [x] Set up appsettings.json with connection strings
+- [x] Configure Swagger/OpenAPI documentation
 
 #### Frontend Setup
-- [ ] Create React application with TypeScript
-  - [ ] Use Vite or Create React App
-  - [ ] Configure TypeScript
-- [ ] Install npm packages
-  - [ ] React Router
-  - [ ] Redux Toolkit (or Zustand)
-  - [ ] Material-UI or Ant Design
-  - [ ] Axios
-  - [ ] React Hook Form
-  - [ ] date-fns or Day.js
+- [x] Create React application with TypeScript
+  - [x] Use Vite
+  - [x] Configure TypeScript
+- [x] Install npm packages
+  - [x] React Router
+  - [x] Redux Toolkit
+  - [x] Material-UI
+  - [x] Axios
+  - [x] React Hook Form
+  - [x] date-fns
   - [ ] Jest + React Testing Library
-- [ ] Set up project structure (components, pages, services, store)
-- [ ] Configure ESLint and Prettier
+- [x] Set up project structure (components, pages, services, store)
+- [x] Configure ESLint and Prettier
 - [ ] Set up environment variables
 
 #### Database Setup
 - [ ] Create SQL Server database (local/Azure)
-- [ ] Configure Entity Framework Core
-- [ ] Create initial migration structure
+- [x] Configure Entity Framework Core
+- [x] Create initial migration structure
 - [ ] Set up database seeding for development data
 
 #### DevOps Setup
-- [ ] Create .gitignore files for .NET and React
-- [ ] Set up Git repository structure
-- [ ] Create README.md with setup instructions
+- [x] Create .gitignore files for .NET and React
+- [x] Set up Git repository structure
+- [x] Create README.md with setup instructions
 - [ ] Configure GitHub Actions for CI/CD (optional for MVP)
-- [ ] Set up Docker configuration (optional for MVP)
+- [x] Set up Docker configuration
 
 ---
 
@@ -59,42 +59,42 @@
 ### Domain Entities
 
 #### User Management
-- [ ] Create User entity
-  - [ ] Id, Email, PasswordHash, FirstName, LastName
-  - [ ] Phone, Role, ProfilePictureUrl
-  - [ ] EmailConfirmed, IsActive, CreatedAt, UpdatedAt
-- [ ] Create RefreshToken entity
-- [ ] Create Tenant entity
+- [x] Create User entity
+  - [x] Id, Email, PasswordHash, FirstName, LastName
+  - [x] Phone, Role, ProfilePictureUrl
+  - [x] EmailConfirmed, IsActive, CreatedAt, UpdatedAt
+- [x] Create RefreshToken entity
+- [x] Create Tenant entity
 - [ ] Implement value objects (Email, Phone, etc.)
 - [ ] Create user-related interfaces (IUserRepository, IAuthService)
 
 #### Business Entities
-- [ ] Create Salon entity
-  - [ ] Basic info, address, business hours (JSON)
-  - [ ] Rating aggregates
-- [ ] Create SalonImage entity
-- [ ] Create ServiceCategory entity
-- [ ] Create Service entity
-  - [ ] Name, description, duration, price
-- [ ] Create Staff entity
-  - [ ] Working hours (JSON), specialties
-- [ ] Create StaffService junction entity
+- [x] Create Salon entity
+  - [x] Basic info, address, business hours (JSON)
+  - [x] Rating aggregates
+- [x] Create SalonImage entity
+- [x] Create ServiceCategory entity
+- [x] Create Service entity
+  - [x] Name, description, duration, price
+- [x] Create Staff entity
+  - [x] Working hours (JSON), specialties
+- [x] Create StaffService junction entity
 
 #### Appointment Entities
-- [ ] Create Appointment entity
-  - [ ] Customer, Staff, Service relationships
-  - [ ] StartTime, EndTime, Status
-  - [ ] Notes, cancellation info
-- [ ] Create TimeBlock entity (for blocking staff availability)
-- [ ] Create Review entity
-- [ ] Create Payment entity
+- [x] Create Appointment entity
+  - [x] Customer, Staff, Service relationships
+  - [x] StartTime, EndTime, Status
+  - [x] Notes, cancellation info
+- [x] Create TimeBlock entity (for blocking staff availability)
+- [x] Create Review entity
+- [x] Create Payment entity
 - [ ] Create Notification entity
 
 ### Database Implementation
-- [ ] Create DbContext with all entities
-- [ ] Configure entity relationships
-- [ ] Add indexes for performance
-- [ ] Create initial migration
+- [x] Create DbContext with all entities
+- [x] Configure entity relationships
+- [x] Add indexes for performance
+- [x] Create initial migration
 - [ ] Apply migration to database
 - [ ] Create seed data for development
   - [ ] Sample tenants
