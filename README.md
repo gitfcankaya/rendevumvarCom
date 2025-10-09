@@ -165,6 +165,70 @@ The frontend will be available at `http://localhost:5173`
 Once the API is running, access the Swagger documentation at:
 - `https://localhost:7000/swagger`
 
+### Testing Authentication
+
+1. **Register a new user:**
+   - Open Swagger UI at `https://localhost:7000/swagger`
+   - Find `POST /api/auth/register` endpoint
+   - Click "Try it out"
+   - Fill in the request body:
+   ```json
+   {
+     "email": "test@example.com",
+     "password": "Test123!",
+     "confirmPassword": "Test123!",
+     "firstName": "Test",
+     "lastName": "User",
+     "phone": "+905551234567",
+     "role": "Customer"
+   }
+   ```
+   - Click "Execute"
+   - Copy the `accessToken` from the response
+
+2. **Authorize in Swagger:**
+   - Click the "Authorize" button (🔒) at the top of Swagger UI
+   - Enter: `Bearer your-copied-access-token`
+   - Click "Authorize"
+   - Now you can test protected endpoints!
+
+For detailed authentication documentation, see [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md)
+
+## ✅ Current Implementation Status
+
+### Phase 1: Project Setup (100% Complete) ✅
+- Backend solution with Clean Architecture
+- Frontend scaffold with React + TypeScript + Vite
+- Docker configuration
+- Database schema designed
+
+### Phase 2: Domain Entities (90% Complete) ✅
+- All 13 core entities implemented
+- DbContext configured with relationships
+- Initial migration created
+- Awaiting database setup for testing
+
+### Phase 3: Authentication (85% Complete) ✅
+- JWT token generation with refresh tokens
+- User registration and login
+- Password hashing with BCrypt
+- Role-based authorization
+- Complete AuthController with 6 endpoints
+- Swagger UI with JWT authentication support
+
+### Phase 4: Core API Endpoints (Next Priority) ⏳
+- Repository pattern implementation
+- Salon, Service, Staff controllers
+- AutoMapper DTOs
+- FluentValidation
+
+### Phase 5: Booking System (Upcoming) 📅
+- Availability calculation
+- Appointment booking flow
+- Calendar integration
+
+For a complete task list, see [docs/TODO.md](docs/TODO.md)
+
 ## 🧪 Testing
 
 ### Backend Tests
