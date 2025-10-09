@@ -108,22 +108,21 @@
 ## Phase 3: Authentication and Authorization (Week 3)
 
 ### Backend Auth
-- [ ] Implement JWT token generation
-  - [ ] Access token (15 min expiry)
-  - [ ] Refresh token (7 days expiry)
-- [ ] Create AuthController
-  - [ ] POST /api/auth/register
-  - [ ] POST /api/auth/login
-  - [ ] POST /api/auth/refresh
-  - [ ] POST /api/auth/logout
-  - [ ] POST /api/auth/forgot-password
-  - [ ] POST /api/auth/reset-password
-- [ ] Implement password hashing (bcrypt)
-- [ ] Create authentication middleware
-- [ ] Implement role-based authorization
-  - [ ] [Authorize(Roles = "Customer")]
-  - [ ] [Authorize(Roles = "BusinessOwner")]
-  - [ ] [Authorize(Roles = "Staff")]
+- [x] Implement JWT token generation
+  - [x] Access token (15 min expiry)
+  - [x] Refresh token (7 days expiry)
+- [x] Create AuthController
+  - [x] POST /api/auth/register
+  - [x] POST /api/auth/login
+  - [x] POST /api/auth/refresh
+  - [x] POST /api/auth/logout
+  - [x] POST /api/auth/forgot-password (placeholder)
+  - [x] POST /api/auth/reset-password (placeholder)
+- [x] Implement password hashing (bcrypt)
+- [x] Create authentication middleware
+- [x] Implement role-based authorization
+  - [x] Roles: Customer, BusinessOwner, Staff, Admin
+  - [x] JWT claims-based authorization
 - [ ] Create tenant resolution middleware
 - [ ] Implement rate limiting for auth endpoints
 
