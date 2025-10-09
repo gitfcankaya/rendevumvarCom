@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("RendevumVar.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6eae1ad71001f395b0f476509ab6aa7f62f01cbd")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f5201c6538fc06a94acb59d6537e48eb6115aee3")]
 [assembly: System.Reflection.AssemblyProductAttribute("RendevumVar.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("RendevumVar.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
