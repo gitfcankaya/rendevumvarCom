@@ -1,0 +1,13 @@
+document.querySelectorAll(".reference-button").forEach(element => {
+  element.addEventListener("click", function(ev){
+    ev.preventDefault();
+
+    document.querySelectorAll(".reference-item").forEach(element => {
+      element.style.display = "none";
+    });
+
+    document.querySelectorAll("."+ev.target.id).forEach(element => {
+      element.style.display = "block";
+    });
+  }); 
+});

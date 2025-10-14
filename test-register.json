@@ -1,0 +1,9 @@
+{
+  "email": "test@example.com",
+  "password": "Test123!",
+  "confirmPassword": "Test123!",
+  "firstName": "Test",
+  "lastName": "User",
+  "phone": "5551234567",
+  "role": "Customer"
+}

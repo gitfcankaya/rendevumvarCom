@@ -3,10 +3,20 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using RendevumVar.Infrastructure.Data;
+using RendevumVar.Infrastructure.Data.Seeders;
 using RendevumVar.Application.Interfaces;
 using RendevumVar.Application.Services;
+using RendevumVar.API.Middleware;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .CreateLogger();
+
+builder.Host.UseSerilog();
 
 // Add services to the container
 builder.Services.AddControllers();
@@ -18,6 +28,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // Register application services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IServiceService, ServiceService>();
+builder.Services.AddScoped<IServiceCategoryService, ServiceCategoryService>();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -87,7 +99,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowFrontend",
         policy =>
         {
-            policy.WithOrigins("http://localhost:5173", "http://localhost:3000")
+            policy.WithOrigins("http://localhost:5173", "http://localhost:5174", "http://localhost:3000")
                   .AllowAnyHeader()
                   .AllowAnyMethod();
         });
@@ -105,17 +117,33 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
-
 app.UseCors("AllowFrontend");
+
+// Test database connection
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    try
+    {
+        await context.Database.CanConnectAsync();
+        app.Logger.LogInformation("Database connection successful");
+        app.Logger.LogInformation("Database setup completed");
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Database connection failed");
+    }
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 
-// Health check endpoint
-app.MapGet("/health", () => Results.Ok(new { status = "Healthy", timestamp = DateTime.UtcNow }))
-   .WithName("HealthCheck");
+// Simple test endpoint
+app.MapGet("/", () => "RendevumVar API is running!");
+app.MapGet("/health", () => "Healthy");
+
+app.Logger.LogInformation("RendevumVar API is starting...");
 
 app.Run();

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RendevumVar.Core.Entities;
+using RendevumVar.Core.Enums;
 
 namespace RendevumVar.Infrastructure.Data;
 
@@ -21,6 +22,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<TimeBlock> TimeBlocks { get; set; }
     public DbSet<Review> Reviews { get; set; }
     public DbSet<Payment> Payments { get; set; }
+    public DbSet<ContentPage> ContentPages { get; set; }
+    public DbSet<SubscriptionPlan> SubscriptionPlans { get; set; }
+    public DbSet<Subscription> Subscriptions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -278,36 +282,95 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // Payment Configuration
+        // ContentPage Configuration
+        modelBuilder.Entity<ContentPage>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Title).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Slug).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Content).IsRequired();
+            entity.Property(e => e.MetaDescription).HasMaxLength(500);
+            entity.Property(e => e.MetaKeywords).HasMaxLength(500);
+            entity.Property(e => e.ImageUrl).HasMaxLength(500);
+            entity.Property(e => e.ButtonText).HasMaxLength(100);
+            entity.Property(e => e.ButtonUrl).HasMaxLength(500);
+            
+            entity.HasIndex(e => e.Slug).IsUnique();
+            entity.HasIndex(e => e.IsActive);
+            entity.HasIndex(e => e.SortOrder);
+        });
+
+        // SubscriptionPlan Configuration
+        modelBuilder.Entity<SubscriptionPlan>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.Price).HasPrecision(18, 2);
+            entity.Property(e => e.OriginalPrice).HasPrecision(18, 2);
+            entity.Property(e => e.Features).HasColumnType("nvarchar(max)");
+            entity.Property(e => e.Badge).HasMaxLength(50);
+            entity.Property(e => e.Color).HasMaxLength(20);
+            
+            entity.HasIndex(e => e.IsActive);
+            entity.HasIndex(e => e.SortOrder);
+        });
+
+        // Subscription Configuration
+        modelBuilder.Entity<Subscription>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.AmountPaid).HasPrecision(18, 2);
+            entity.Property(e => e.CancellationReason).HasMaxLength(500);
+            
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.Subscriptions)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            entity.HasOne(e => e.SubscriptionPlan)
+                .WithMany(sp => sp.Subscriptions)
+                .HasForeignKey(e => e.SubscriptionPlanId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.StartDate);
+            entity.HasIndex(e => e.EndDate);
+        });
+
+        // Update Payment Configuration
         modelBuilder.Entity<Payment>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.Amount).HasPrecision(10, 2);
-            entity.Property(e => e.RefundAmount).HasPrecision(10, 2);
-            entity.Property(e => e.Currency).HasMaxLength(3);
-            entity.Property(e => e.PaymentMethod).HasMaxLength(50);
-            entity.Property(e => e.Status).HasMaxLength(20);
-            entity.Property(e => e.TransactionId).HasMaxLength(200);
+            entity.Property(e => e.Amount).HasPrecision(18, 2);
+            entity.Property(e => e.Currency).HasMaxLength(3).HasDefaultValue("TRY");
+            entity.Property(e => e.TransactionId).HasMaxLength(100);
             entity.Property(e => e.PaymentGateway).HasMaxLength(50);
-            entity.HasIndex(e => e.AppointmentId);
-            entity.HasIndex(e => e.TransactionId);
-            entity.HasIndex(e => e.Status);
+            entity.Property(e => e.PaymentReference).HasMaxLength(100);
+            entity.Property(e => e.FailureReason).HasMaxLength(500);
+            entity.Property(e => e.RefundAmount).HasPrecision(18, 2);
+            entity.Property(e => e.PaymentDetails).HasColumnType("nvarchar(max)");
+
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.Payments)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             entity.HasOne(e => e.Appointment)
                 .WithMany(a => a.Payments)
                 .HasForeignKey(e => e.AppointmentId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            entity.HasOne(e => e.Subscription)
+                .WithMany(s => s.Payments)
+                .HasForeignKey(e => e.SubscriptionId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.Method);
+            entity.HasIndex(e => e.TransactionId);
         });
-
-        // Add check constraints
-        modelBuilder.Entity<Review>()
-            .ToTable(t => t.HasCheckConstraint("CK_Review_Rating", "Rating >= 1 AND Rating <= 5"));
-
-        modelBuilder.Entity<Service>()
-            .ToTable(t => 
-            {
-                t.HasCheckConstraint("CK_Service_Duration", "DurationMinutes > 0");
-                t.HasCheckConstraint("CK_Service_Price", "Price >= 0");
-            });
     }
 }
