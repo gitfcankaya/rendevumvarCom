@@ -1,4 +1,157 @@
-// Mock appointment service - gerçek API gelince replace edilecek
+import axios from 'axios';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add auth token to requests
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Appointment Types
+export interface CreateAppointmentDto {
+  salonId: string;
+  serviceId: string;
+  staffId: string;
+  startTime: string; // ISO date string
+  notes?: string;
+  customerNotes?: string;
+}
+
+export interface AppointmentDto {
+  id: string;
+  tenantId: string;
+  salonId: string;
+  salonName: string;
+  customerId: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string;
+  staffId: string;
+  staffName: string;
+  serviceId: string;
+  serviceName: string;
+  serviceDuration: number;
+  servicePrice: number;
+  startTime: string;
+  endTime: string;
+  status: AppointmentStatus;
+  notes?: string;
+  customerNotes?: string;
+  staffNotes?: string;
+  cancellationReason?: string;
+  cancelledAt?: string;
+  totalPrice: number;
+  depositPaid: number;
+  reminderSent: boolean;
+  createdAt: string;
+  // Computed fields
+  duration?: number; // serviceDuration alias for compatibility
+}
+
+export interface AppointmentDetailsDto extends AppointmentDto {
+  salon: SalonDto;
+  service: ServiceDto;
+  staff: StaffDto;
+  payments: PaymentDto[];
+}
+
+export interface SalonDto {
+  id: string;
+  tenantId: string;
+  name: string;
+  address: string;
+  city: string;
+  phone: string;
+  email: string;
+  state?: string;
+  postalCode?: string;
+  latitude?: number;
+  longitude?: number;
+  businessHours?: string;
+  isActive: boolean;
+  averageRating: number;
+  reviewCount: number;
+  createdAt: string;
+}
+
+export interface ServiceDto {
+  id: string;
+  name: string;
+  description?: string;
+  durationMinutes: number;
+  price: number;
+  imageUrl?: string;
+  categoryId?: string;
+  categoryName?: string;
+  isActive: boolean;
+}
+
+export interface StaffDto {
+  id: string;
+  tenantId: string;
+  salonId: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  bio?: string;
+  photoUrl?: string;
+  profilePictureUrl?: string;
+  averageRating: number;
+  status: string;
+  invitationStatus: string;
+  roleId: string;
+  roleName?: string;
+}
+
+export interface PaymentDto {
+  id: string;
+  amount: number;
+  method: string;
+  status: string;
+}
+
+export interface AvailableTimeSlotDto {
+  date: string;
+  startTime: string; // TimeSpan format
+  endTime: string;
+  durationMinutes: number;
+}
+
+export interface RescheduleAppointmentDto {
+  newStartTime: string;
+  newStaffId?: string;
+}
+
+export interface CancelAppointmentDto {
+  cancellationReason?: string;
+}
+
+export const AppointmentStatus = {
+  Pending: 0,
+  Confirmed: 1,
+  CheckedIn: 2,
+  InProgress: 3,
+  Completed: 4,
+  Cancelled: 5,
+  NoShow: 6,
+} as const;
+
+export type AppointmentStatus = typeof AppointmentStatus[keyof typeof AppointmentStatus];
+
+// Legacy types for backward compatibility with dashboard
 export interface Appointment {
   id: string;
   customerName: string;
@@ -10,7 +163,7 @@ export interface Appointment {
   appointmentDate: string;
   appointmentTime: string;
   status: 'scheduled' | 'completed' | 'cancelled' | 'in-progress';
-  duration: number; // dakika
+  duration: number;
   notes?: string;
 }
 
@@ -19,7 +172,7 @@ export interface Service {
   name: string;
   description: string;
   price: number;
-  duration: number; // dakika
+  duration: number;
   category: string;
   isActive: boolean;
 }
@@ -57,366 +210,270 @@ export interface DashboardStats {
   ratingGrowth: number;
 }
 
-// Mock data
-const mockAppointments: Appointment[] = [
-  {
-    id: '1',
-    customerName: 'Ahmet Yılmaz',
-    customerPhone: '0532 123 45 67',
-    customerEmail: 'ahmet@example.com',
-    serviceName: 'Saç Kesimi',
-    servicePrice: 150,
-    staffName: 'Mehmet Usta',
-    appointmentDate: '2025-10-12',
-    appointmentTime: '10:00',
-    status: 'scheduled',
-    duration: 45,
-    notes: 'Kısa saç kesimi istiyor'
-  },
-  {
-    id: '2',
-    customerName: 'Ayşe Demir',
-    customerPhone: '0533 987 65 43',
-    customerEmail: 'ayse@example.com',
-    serviceName: 'Saç Boyama',
-    servicePrice: 300,
-    staffName: 'Fatma Hanım',
-    appointmentDate: '2025-10-12',
-    appointmentTime: '14:30',
-    status: 'in-progress',
-    duration: 120
-  },
-  {
-    id: '3',
-    customerName: 'Can Özkan',
-    customerPhone: '0534 456 78 90',
-    customerEmail: 'can@example.com',
-    serviceName: 'Sakal Traşı',
-    servicePrice: 75,
-    staffName: 'Ali Usta',
-    appointmentDate: '2025-10-12',
-    appointmentTime: '16:00',
-    status: 'scheduled',
-    duration: 30
-  },
-  {
-    id: '4',
-    customerName: 'Zeynep Kaya',
-    customerPhone: '0535 789 01 23',
-    customerEmail: 'zeynep@example.com',
-    serviceName: 'Makyaj',
-    servicePrice: 200,
-    staffName: 'Elif Hanım',
-    appointmentDate: '2025-10-13',
-    appointmentTime: '11:00',
-    status: 'scheduled',
-    duration: 60
-  }
-];
+// Helper function to convert AppointmentDto to legacy Appointment format
+const convertToLegacyAppointment = (dto: AppointmentDto): Appointment => {
+  const startTime = new Date(dto.startTime);
+  const statusMap: Record<number, 'scheduled' | 'completed' | 'cancelled' | 'in-progress'> = {
+    0: 'scheduled', // Pending
+    1: 'scheduled', // Confirmed
+    2: 'in-progress', // CheckedIn
+    3: 'in-progress', // InProgress
+    4: 'completed', // Completed
+    5: 'cancelled', // Cancelled
+    6: 'cancelled', // NoShow
+  };
 
-const mockServices: Service[] = [
-  {
-    id: '1',
-    name: 'Saç Kesimi',
-    description: 'Profesyonel erkek saç kesimi',
-    price: 150,
-    duration: 45,
-    category: 'Saç',
-    isActive: true
-  },
-  {
-    id: '2',
-    name: 'Saç Boyama',
-    description: 'Doğal saç boyama hizmeti',
-    price: 300,
-    duration: 120,
-    category: 'Saç',
-    isActive: true
-  },
-  {
-    id: '3',
-    name: 'Sakal Traşı',
-    description: 'Geleneksel sakal traşı',
-    price: 75,
-    duration: 30,
-    category: 'Sakal',
-    isActive: true
-  },
-  {
-    id: '4',
-    name: 'Makyaj',
-    description: 'Özel gün makyajı',
-    price: 200,
-    duration: 60,
-    category: 'Makyaj',
-    isActive: true
-  },
-  {
-    id: '5',
-    name: 'Kaş Alma',
-    description: 'Profesyonel kaş alma',
-    price: 50,
-    duration: 20,
-    category: 'Kaş',
-    isActive: true
-  }
-];
+  return {
+    id: dto.id,
+    customerName: dto.customerName,
+    customerPhone: dto.customerPhone || '',
+    customerEmail: dto.customerEmail,
+    serviceName: dto.serviceName,
+    servicePrice: dto.servicePrice,
+    staffName: dto.staffName,
+    appointmentDate: startTime.toISOString().split('T')[0],
+    appointmentTime: startTime.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+    status: statusMap[dto.status] || 'scheduled',
+    duration: dto.serviceDuration,
+    notes: dto.notes,
+  };
+};
 
-const mockStaff: Staff[] = [
-  {
-    id: '1',
-    firstName: 'Mehmet',
-    lastName: 'Usta',
-    email: 'mehmet@salon.com',
-    phone: '0532 111 22 33',
-    specialties: ['Saç Kesimi', 'Sakal Traşı'],
-    isActive: true
-  },
-  {
-    id: '2',
-    firstName: 'Fatma',
-    lastName: 'Hanım',
-    email: 'fatma@salon.com',
-    phone: '0533 444 55 66',
-    specialties: ['Saç Boyama', 'Saç Kesimi'],
-    isActive: true
-  },
-  {
-    id: '3',
-    firstName: 'Ali',
-    lastName: 'Usta',
-    email: 'ali@salon.com',
-    phone: '0534 777 88 99',
-    specialties: ['Sakal Traşı', 'Saç Kesimi'],
-    isActive: true
-  },
-  {
-    id: '4',
-    firstName: 'Elif',
-    lastName: 'Hanım',
-    email: 'elif@salon.com',
-    phone: '0535 222 33 44',
-    specialties: ['Makyaj', 'Kaş Alma'],
-    isActive: true
-  }
-];
-
-const mockCustomers: Customer[] = [
-  {
-    id: '1',
-    firstName: 'Ahmet',
-    lastName: 'Yılmaz',
-    email: 'ahmet@example.com',
-    phone: '0532 123 45 67',
-    lastVisit: '2025-10-10',
-    totalAppointments: 5,
-    totalSpent: 750
-  },
-  {
-    id: '2',
-    firstName: 'Ayşe',
-    lastName: 'Demir',
-    email: 'ayse@example.com',
-    phone: '0533 987 65 43',
-    lastVisit: '2025-10-08',
-    totalAppointments: 12,
-    totalSpent: 2400
-  },
-  {
-    id: '3',
-    firstName: 'Can',
-    lastName: 'Özkan',
-    email: 'can@example.com',
-    phone: '0534 456 78 90',
-    lastVisit: '2025-10-05',
-    totalAppointments: 3,
-    totalSpent: 225
-  },
-  {
-    id: '4',
-    firstName: 'Zeynep',
-    lastName: 'Kaya',
-    email: 'zeynep@example.com',
-    phone: '0535 789 01 23',
-    lastVisit: '2025-09-28',
-    totalAppointments: 8,
-    totalSpent: 1600
-  }
-];
-
+// API Service
 export const appointmentService = {
-  // Appointments
-  getAllAppointments: async (): Promise<Appointment[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(mockAppointments), 300);
+  // Create appointment
+  createAppointment: async (data: CreateAppointmentDto): Promise<AppointmentDto> => {
+    const response = await api.post('/appointments', data);
+    return response.data;
+  },
+
+  // Get appointment details
+  getAppointmentDetails: async (id: string): Promise<AppointmentDetailsDto> => {
+    const response = await api.get(`/appointments/${id}`);
+    return response.data;
+  },
+
+  // Get customer's appointments
+  getMyAppointments: async (
+    startDate?: string,
+    endDate?: string,
+    status?: AppointmentStatus
+  ): Promise<AppointmentDto[]> => {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    if (status !== undefined) params.append('status', status.toString());
+
+    const response = await api.get(`/appointments/my?${params.toString()}`);
+    return response.data;
+  },
+
+  // Get staff appointments
+  getStaffAppointments: async (
+    staffId: string,
+    startDate?: string,
+    endDate?: string
+  ): Promise<AppointmentDto[]> => {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+
+    const response = await api.get(`/appointments/staff/${staffId}?${params.toString()}`);
+    return response.data;
+  },
+
+  // Get salon appointments
+  getSalonAppointments: async (
+    salonId: string,
+    startDate?: string,
+    endDate?: string
+  ): Promise<AppointmentDto[]> => {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+
+    const response = await api.get(`/appointments/salon/${salonId}?${params.toString()}`);
+    return response.data;
+  },
+
+  // Update appointment status
+  updateAppointmentStatus: async (
+    id: string,
+    status: AppointmentStatus,
+    cancellationReason?: string
+  ): Promise<AppointmentDto> => {
+    const response = await api.put(`/appointments/${id}/status`, {
+      status,
+      cancellationReason,
     });
+    return response.data;
+  },
+
+  // Reschedule appointment
+  rescheduleAppointment: async (
+    id: string,
+    data: RescheduleAppointmentDto
+  ): Promise<AppointmentDto> => {
+    const response = await api.put(`/appointments/${id}/reschedule`, data);
+    return response.data;
+  },
+
+  // Cancel appointment
+  cancelAppointment: async (id: string, cancellationReason?: string): Promise<void> => {
+    await api.delete(`/appointments/${id}`, {
+      data: { cancellationReason },
+    });
+  },
+
+  // Get available time slots
+  getAvailableTimeSlots: async (
+    staffId: string,
+    date: string,
+    serviceDurationMinutes: number = 60
+  ): Promise<AvailableTimeSlotDto[]> => {
+    const params = new URLSearchParams({
+      staffId,
+      date,
+      serviceDurationMinutes: serviceDurationMinutes.toString(),
+    });
+
+    const response = await api.get(`/appointments/availability?${params.toString()}`);
+    return response.data;
+  },
+
+  // Get available staff for a service at a specific time
+  getAvailableStaff: async (
+    salonId: string,
+    serviceId: string,
+    dateTime: string,
+    durationMinutes: number = 60
+  ): Promise<StaffDto[]> => {
+    const params = new URLSearchParams({
+      salonId,
+      serviceId,
+      dateTime,
+      durationMinutes: durationMinutes.toString(),
+    });
+
+    const response = await api.get(`/appointments/availability/staff?${params.toString()}`);
+    return response.data;
+  },
+
+  // Get salon-wide availability
+  getSalonAvailability: async (
+    salonId: string,
+    serviceId: string,
+    date: string
+  ): Promise<Record<string, AvailableTimeSlotDto[]>> => {
+    const params = new URLSearchParams({
+      serviceId,
+      date,
+    });
+
+    const response = await api.get(`/appointments/availability/salon/${salonId}?${params.toString()}`);
+    return response.data;
+  },
+
+  // Legacy methods for dashboard compatibility
+  getAllAppointments: async (): Promise<Appointment[]> => {
+    const response = await api.get('/appointments/my');
+    const appointments: AppointmentDto[] = response.data;
+    return appointments.map(convertToLegacyAppointment);
   },
 
   getTodayAppointments: async (): Promise<Appointment[]> => {
-    return new Promise((resolve) => {
-      const today = new Date().toISOString().split('T')[0];
-      const todayAppointments = mockAppointments.filter(
-        apt => apt.appointmentDate === today
-      );
-      setTimeout(() => resolve(todayAppointments), 300);
-    });
+    const today = new Date().toISOString().split('T')[0];
+    const response = await api.get(`/appointments/my?startDate=${today}&endDate=${today}`);
+    const appointments: AppointmentDto[] = response.data;
+    return appointments.map(convertToLegacyAppointment);
   },
 
-  createAppointment: async (appointment: Omit<Appointment, 'id'>): Promise<Appointment> => {
-    return new Promise((resolve) => {
-      const newAppointment = {
-        ...appointment,
-        id: Math.random().toString(36).substr(2, 9)
-      };
-      mockAppointments.push(newAppointment);
-      setTimeout(() => resolve(newAppointment), 300);
-    });
+  getDailyAppointments: async (date: string): Promise<Appointment[]> => {
+    const response = await api.get(`/appointments/my?startDate=${date}&endDate=${date}`);
+    const appointments: AppointmentDto[] = response.data;
+    return appointments.map(convertToLegacyAppointment);
   },
 
-  updateAppointmentStatus: async (id: string, status: Appointment['status']): Promise<void> => {
-    return new Promise((resolve) => {
-      const appointment = mockAppointments.find(apt => apt.id === id);
-      if (appointment) {
-        appointment.status = status;
+  getWeeklyAppointments: async (startDate: string): Promise<Appointment[]> => {
+    const start = new Date(startDate);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const endDate = end.toISOString().split('T')[0];
+
+    const response = await api.get(`/appointments/my?startDate=${startDate}&endDate=${endDate}`);
+    const appointments: AppointmentDto[] = response.data;
+    return appointments.map(convertToLegacyAppointment).sort((a, b) => {
+      if (a.appointmentDate === b.appointmentDate) {
+        return a.appointmentTime.localeCompare(b.appointmentTime);
       }
-      setTimeout(() => resolve(), 300);
+      return a.appointmentDate.localeCompare(b.appointmentDate);
     });
   },
 
-  // Services
-  getAllServices: async (): Promise<Service[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(mockServices), 300);
+  getMonthlyAppointments: async (year: number, month: number): Promise<Appointment[]> => {
+    const startDate = new Date(year, month, 1).toISOString().split('T')[0];
+    const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
+
+    const response = await api.get(`/appointments/my?startDate=${startDate}&endDate=${endDate}`);
+    const appointments: AppointmentDto[] = response.data;
+    return appointments.map(convertToLegacyAppointment).sort((a, b) => {
+      if (a.appointmentDate === b.appointmentDate) {
+        return a.appointmentTime.localeCompare(b.appointmentTime);
+      }
+      return a.appointmentDate.localeCompare(b.appointmentDate);
     });
+  },
+
+  getAppointmentsByDateRange: async (startDate: string, endDate: string): Promise<Appointment[]> => {
+    const response = await api.get(`/appointments/my?startDate=${startDate}&endDate=${endDate}`);
+    const appointments: AppointmentDto[] = response.data;
+    return appointments.map(convertToLegacyAppointment).sort((a, b) => {
+      if (a.appointmentDate === b.appointmentDate) {
+        return a.appointmentTime.localeCompare(b.appointmentTime);
+      }
+      return a.appointmentDate.localeCompare(b.appointmentDate);
+    });
+  },
+
+  // Placeholder methods - these need proper implementation
+  getAllServices: async (): Promise<Service[]> => {
+    // TODO: Implement with real service API
+    return [];
   },
 
   createService: async (service: Omit<Service, 'id'>): Promise<Service> => {
-    return new Promise((resolve) => {
-      const newService = {
-        ...service,
-        id: Math.random().toString(36).substr(2, 9)
-      };
-      mockServices.push(newService);
-      setTimeout(() => resolve(newService), 300);
-    });
+    // TODO: Implement with real service API
+    return { ...service, id: '' };
   },
 
-  // Staff
   getAllStaff: async (): Promise<Staff[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(mockStaff), 300);
-    });
+    // TODO: Implement with real staff API
+    return [];
   },
 
   createStaff: async (staff: Omit<Staff, 'id'>): Promise<Staff> => {
-    return new Promise((resolve) => {
-      const newStaff = {
-        ...staff,
-        id: Math.random().toString(36).substr(2, 9)
-      };
-      mockStaff.push(newStaff);
-      setTimeout(() => resolve(newStaff), 300);
-    });
+    // TODO: Implement with real staff API
+    return { ...staff, id: '' };
   },
 
-  // Customers
   getAllCustomers: async (): Promise<Customer[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(mockCustomers), 300);
-    });
+    // TODO: Implement with real customer API
+    return [];
   },
 
-  // Dashboard Stats
   getDashboardStats: async (): Promise<DashboardStats> => {
-    return new Promise((resolve) => {
-      const today = new Date().toISOString().split('T')[0];
-      const todayAppointments = mockAppointments.filter(
-        apt => apt.appointmentDate === today
-      ).length;
-
-      const thisMonthRevenue = mockAppointments
-        .filter(apt => apt.status === 'completed')
-        .reduce((total, apt) => total + apt.servicePrice, 0);
-
-      setTimeout(() => resolve({
-        todayAppointments: todayAppointments,
-        totalCustomers: mockCustomers.length,
-        monthlyRevenue: thisMonthRevenue + 2450, // Mock monthly revenue
-        averageRating: 4.8,
-        appointmentGrowth: 15,
-        customerGrowth: 8,
-        revenueGrowth: -3,
-        ratingGrowth: 0.2
-      }), 300);
-    });
+    // TODO: Implement with real dashboard API
+    return {
+      todayAppointments: 0,
+      totalCustomers: 0,
+      monthlyRevenue: 0,
+      averageRating: 0,
+      appointmentGrowth: 0,
+      customerGrowth: 0,
+      revenueGrowth: 0,
+      ratingGrowth: 0,
+    };
   },
-
-  // Daily Appointments
-  getDailyAppointments: async (date: string): Promise<Appointment[]> => {
-    return new Promise((resolve) => {
-      const dailyAppointments = mockAppointments.filter(
-        apt => apt.appointmentDate === date
-      ).sort((a, b) => a.appointmentTime.localeCompare(b.appointmentTime));
-      
-      setTimeout(() => resolve(dailyAppointments), 300);
-    });
-  },
-
-  // Weekly Appointments
-  getWeeklyAppointments: async (startDate: string): Promise<Appointment[]> => {
-    return new Promise((resolve) => {
-      const start = new Date(startDate);
-      const end = new Date(start);
-      end.setDate(start.getDate() + 6);
-
-      const weeklyAppointments = mockAppointments.filter(apt => {
-        const aptDate = new Date(apt.appointmentDate);
-        return aptDate >= start && aptDate <= end;
-      }).sort((a, b) => {
-        if (a.appointmentDate === b.appointmentDate) {
-          return a.appointmentTime.localeCompare(b.appointmentTime);
-        }
-        return a.appointmentDate.localeCompare(b.appointmentDate);
-      });
-
-      setTimeout(() => resolve(weeklyAppointments), 300);
-    });
-  },
-
-  // Monthly Appointments
-  getMonthlyAppointments: async (year: number, month: number): Promise<Appointment[]> => {
-    return new Promise((resolve) => {
-      const monthlyAppointments = mockAppointments.filter(apt => {
-        const aptDate = new Date(apt.appointmentDate);
-        return aptDate.getFullYear() === year && aptDate.getMonth() === month;
-      }).sort((a, b) => {
-        if (a.appointmentDate === b.appointmentDate) {
-          return a.appointmentTime.localeCompare(b.appointmentTime);
-        }
-        return a.appointmentDate.localeCompare(b.appointmentDate);
-      });
-
-      setTimeout(() => resolve(monthlyAppointments), 300);
-    });
-  },
-
-  // Get appointments by date range
-  getAppointmentsByDateRange: async (startDate: string, endDate: string): Promise<Appointment[]> => {
-    return new Promise((resolve) => {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-
-      const rangeAppointments = mockAppointments.filter(apt => {
-        const aptDate = new Date(apt.appointmentDate);
-        return aptDate >= start && aptDate <= end;
-      }).sort((a, b) => {
-        if (a.appointmentDate === b.appointmentDate) {
-          return a.appointmentTime.localeCompare(b.appointmentTime);
-        }
-        return a.appointmentDate.localeCompare(b.appointmentDate);
-      });
-
-      setTimeout(() => resolve(rangeAppointments), 300);
-    });
-  }
 };
+
+export default appointmentService;

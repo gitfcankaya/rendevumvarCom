@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Box,
@@ -272,7 +272,7 @@ const DashboardPage: React.FC = () => {
             </Card>
           </Grid>
 
-          <Grid xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={3}>
             <Card 
               sx={{ 
                 borderRadius: 3,
@@ -321,7 +321,7 @@ const DashboardPage: React.FC = () => {
             </Card>
           </Grid>
 
-          <Grid xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={3}>
             <Card 
               sx={{ 
                 borderRadius: 3,
@@ -370,7 +370,7 @@ const DashboardPage: React.FC = () => {
             </Card>
           </Grid>
 
-          <Grid xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={3}>
             <Card 
               sx={{ 
                 borderRadius: 3,
@@ -425,7 +425,7 @@ const DashboardPage: React.FC = () => {
           Hızlı İşlemler
         </Typography>
         <Grid container spacing={2} sx={{ mb: 4 }}>
-          <Grid xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={3}>
             <Button
               fullWidth
               variant="contained"
@@ -443,7 +443,7 @@ const DashboardPage: React.FC = () => {
               Yeni Randevu
             </Button>
           </Grid>
-          <Grid xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={3}>
             <Button
               fullWidth
               variant="contained"
@@ -461,7 +461,7 @@ const DashboardPage: React.FC = () => {
               Yeni Müşteri
             </Button>
           </Grid>
-          <Grid xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={3}>
             <Button
               fullWidth
               variant="contained"
@@ -479,7 +479,7 @@ const DashboardPage: React.FC = () => {
               Yeni Hizmet
             </Button>
           </Grid>
-          <Grid xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={3}>
             <Button
               fullWidth
               variant="contained"
@@ -502,7 +502,7 @@ const DashboardPage: React.FC = () => {
         {/* Main Content */}
         <Grid container spacing={3}>
           {/* Today's Appointments */}
-          <Grid xs={12} lg={8}>
+          <Grid item xs={12} lg={8}>
             <Card sx={{ borderRadius: 3, boxShadow: 'rgba(0,0,0,0.1) 0px 4px 12px' }}>
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -590,7 +590,7 @@ const DashboardPage: React.FC = () => {
           </Grid>
 
           {/* Recent Activities */}
-          <Grid xs={12} lg={4}>
+          <Grid item xs={12} lg={4}>
             <Card sx={{ borderRadius: 3, boxShadow: 'rgba(0,0,0,0.1) 0px 4px 12px', mb: 3 }}>
               <CardContent>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
@@ -745,3 +745,4 @@ const DashboardPage: React.FC = () => {
 };
 
 export default DashboardPage;
+

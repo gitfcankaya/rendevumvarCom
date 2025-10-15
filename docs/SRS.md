@@ -1131,6 +1131,1346 @@ GET /api/reports/staff-performance (business owner)
 
 ---
 
+## 7. Advanced Features - Detailed Requirements
+
+### 7.1 Subscription Management Module
+
+#### 7.1.1 Subscription Plans
+**FR-SUB-001: Plan Definition**
+- **Description:** System shall support multiple subscription tiers
+- **Priority:** High
+- **Requirements:**
+  - System shall define 4 plan tiers: Free, Starter, Professional, Enterprise
+  - Each plan shall have: name, price, billing cycle, feature limits
+  - System shall support monthly and annual billing cycles
+  - System shall offer discount for annual subscriptions (e.g., 2 months free)
+  - System shall allow custom pricing for Enterprise plans
+
+**Data Model:**
+```csharp
+public class SubscriptionPlan
+{
+    public int Id { get; set; }
+    public string Name { get; set; } // Free, Starter, Professional, Enterprise
+    public string Description { get; set; }
+    public decimal MonthlyPrice { get; set; }
+    public decimal AnnualPrice { get; set; }
+    public int TrialDays { get; set; } // 0-30 days
+    public int MaxStaff { get; set; } // -1 for unlimited
+    public int MaxAppointmentsPerMonth { get; set; } // -1 for unlimited
+    public bool HasAdvancedAnalytics { get; set; }
+    public bool HasSMSNotifications { get; set; }
+    public bool HasCustomBranding { get; set; }
+    public bool HasAPIAccess { get; set; }
+    public bool HasMultiLocation { get; set; }
+    public bool HasPackageManagement { get; set; }
+    public bool IsActive { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public class TenantSubscription
+{
+    public int Id { get; set; }
+    public int TenantId { get; set; }
+    public int SubscriptionPlanId { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+    public DateTime? TrialEndDate { get; set; }
+    public SubscriptionStatus Status { get; set; } // Active, Trialing, Cancelled, Suspended, Expired
+    public BillingCycle BillingCycle { get; set; } // Monthly, Annual
+    public DateTime? NextBillingDate { get; set; }
+    public string PaymentMethodId { get; set; }
+    public bool AutoRenew { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public enum SubscriptionStatus
+{
+    Trialing,
+    Active,
+    PastDue,
+    Cancelled,
+    Suspended,
+    Expired
+}
+
+public enum BillingCycle
+{
+    Monthly,
+    Annual
+}
+```
+
+**FR-SUB-002: Trial Management**
+- **Priority:** High
+- **Requirements:**
+  - System shall automatically activate trial period on business registration
+  - Trial duration shall be configurable per plan (7-30 days)
+  - System shall send reminder emails: 7 days before, 3 days before, 1 day before trial end
+  - System shall automatically downgrade to free plan if no payment method added
+  - System shall allow one trial per tenant (email/phone validation)
+
+**FR-SUB-003: Plan Upgrade/Downgrade**
+- **Priority:** High
+- **Requirements:**
+  - System shall allow self-service plan changes
+  - Upgrades shall be effective immediately
+  - Downgrades shall be effective at next billing cycle
+  - System shall validate feature limits before downgrade (e.g., staff count)
+  - System shall prorate charges for mid-cycle upgrades
+  - System shall send confirmation email after plan change
+
+**API Endpoints:**
+```
+GET /api/subscriptions/plans - Get all available plans
+GET /api/tenants/{tenantId}/subscription - Get current subscription
+POST /api/tenants/{tenantId}/subscription - Create subscription
+PUT /api/tenants/{tenantId}/subscription/upgrade - Upgrade plan
+PUT /api/tenants/{tenantId}/subscription/downgrade - Downgrade plan
+DELETE /api/tenants/{tenantId}/subscription - Cancel subscription
+POST /api/subscriptions/webhooks/payment - Payment gateway webhook
+```
+
+#### 7.1.2 Billing and Invoicing
+**FR-SUB-010: Automatic Billing**
+- **Priority:** High
+- **Requirements:**
+  - System shall charge payment method on billing date
+  - System shall retry failed payments: after 3 days, 5 days, 7 days
+  - System shall send payment receipt via email
+  - System shall suspend account after 3 failed payment attempts
+  - System shall support dunning management
+
+**FR-SUB-011: Invoice Generation**
+- **Priority:** High
+- **Requirements:**
+  - System shall generate PDF invoices
+  - Invoice shall include: invoice number, date, billing details, line items, tax
+  - System shall store invoices in blob storage
+  - System shall email invoice to tenant admin
+  - System shall provide invoice history in dashboard
+
+**Data Model:**
+```csharp
+public class Invoice
+{
+    public int Id { get; set; }
+    public string InvoiceNumber { get; set; } // INV-2025-0001
+    public int TenantId { get; set; }
+    public DateTime InvoiceDate { get; set; }
+    public DateTime DueDate { get; set; }
+    public decimal SubTotal { get; set; }
+    public decimal TaxAmount { get; set; }
+    public decimal TotalAmount { get; set; }
+    public InvoiceStatus Status { get; set; }
+    public string Currency { get; set; } // TRY
+    public string PdfUrl { get; set; }
+    public List<InvoiceLineItem> LineItems { get; set; }
+    public DateTime? PaidAt { get; set; }
+    public string PaymentTransactionId { get; set; }
+}
+
+public enum InvoiceStatus
+{
+    Draft,
+    Sent,
+    Paid,
+    Overdue,
+    Cancelled
+}
+```
+
+### 7.2 Customer-Business Connection System
+
+#### 7.2.1 Invitation Management
+**FR-INV-001: QR Code Invitation**
+- **Description:** Business generates QR code for customer onboarding
+- **Priority:** High
+- **Requirements:**
+  - System shall generate unique QR code per tenant
+  - QR code shall encode invitation URL with tenant ID and token
+  - QR code shall be regeneratable (invalidates old codes)
+  - QR code shall be downloadable as PNG/PDF
+  - QR code shall include tenant logo/branding
+  - Scanning QR code shall open invitation page in mobile browser
+
+**Data Model:**
+```csharp
+public class InvitationCode
+{
+    public int Id { get; set; }
+    public int TenantId { get; set; }
+    public string Code { get; set; } // 6-8 character alphanumeric
+    public InvitationType Type { get; set; } // QR, Link, SMS, Code
+    public string Token { get; set; } // Unique secure token
+    public DateTime CreatedAt { get; set; }
+    public DateTime? ExpiresAt { get; set; } // Null = never expires
+    public int? MaxUses { get; set; } // Null = unlimited
+    public int UsedCount { get; set; }
+    public bool IsActive { get; set; }
+    public string CreatedByUserId { get; set; }
+}
+
+public enum InvitationType
+{
+    QR,
+    Link,
+    SMS,
+    Code
+}
+```
+
+**FR-INV-002: Invitation Link Generation**
+- **Priority:** High
+- **Requirements:**
+  - System shall generate shareable invitation links
+  - Link format: `https://rendevumvar.com/invite/{token}`
+  - Link shall be copyable with one click
+  - System shall track link usage analytics
+  - Link shall work on all devices
+  - Link shall have configurable expiry (7, 30, 90 days, never)
+
+**FR-INV-003: SMS Invitation**
+- **Priority:** High
+- **Requirements:**
+  - Business shall enter customer phone number
+  - System shall validate phone number format
+  - System shall send SMS with invitation link
+  - SMS template: "[Salon Name] sizi davet ediyor! Randevu almak için: {link}"
+  - System shall check SMS delivery status
+  - System shall limit SMS invitations per day (anti-spam)
+  - System shall charge SMS cost to tenant account
+
+**FR-INV-004: Invitation Code System**
+- **Priority:** Medium
+- **Requirements:**
+  - System shall generate 6-8 character alphanumeric codes
+  - Codes shall be easy to type (no ambiguous characters: O/0, I/1)
+  - Customer shall enter code during registration
+  - System shall validate code and establish connection
+  - Codes shall be displayable in salon (poster, business card)
+
+**API Endpoints:**
+```
+POST /api/tenants/{tenantId}/invitations/qr - Generate QR code
+POST /api/tenants/{tenantId}/invitations/link - Generate link
+POST /api/tenants/{tenantId}/invitations/sms - Send SMS invitation
+POST /api/tenants/{tenantId}/invitations/code - Generate invitation code
+GET /api/tenants/{tenantId}/invitations - List all invitations
+GET /api/invitations/{token}/validate - Validate invitation token
+POST /api/invitations/{token}/accept - Accept invitation
+DELETE /api/invitations/{id} - Deactivate invitation
+```
+
+#### 7.2.2 Mutual Approval System
+**FR-CON-001: Connection Request Flow**
+- **Description:** Establish connection between customer and business
+- **Priority:** High
+- **Requirements:**
+  - System shall support bidirectional connection requests
+  - System shall track connection status: Pending, Approved, Rejected, Blocked
+  - System shall send notifications to both parties
+  - System shall allow custom message with request
+  - System shall store connection request timestamp
+
+**Data Model:**
+```csharp
+public class CustomerBusinessConnection
+{
+    public int Id { get; set; }
+    public string CustomerId { get; set; }
+    public int TenantId { get; set; }
+    public ConnectionStatus Status { get; set; }
+    public ConnectionInitiator InitiatedBy { get; set; }
+    public string RequestMessage { get; set; }
+    public string RejectionReason { get; set; }
+    public DateTime RequestedAt { get; set; }
+    public DateTime? RespondedAt { get; set; }
+    public DateTime? LastInteractionAt { get; set; }
+    public int AppointmentCount { get; set; }
+    public bool IsFavorite { get; set; } // Customer can mark business as favorite
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public enum ConnectionStatus
+{
+    PendingCustomerApproval, // Business invited customer
+    PendingBusinessApproval, // Customer requested connection
+    Approved,
+    Rejected,
+    Blocked,
+    Disconnected
+}
+
+public enum ConnectionInitiator
+{
+    Customer,
+    Business
+}
+```
+
+**FR-CON-002: Approval Workflow - Customer Initiates**
+- **Priority:** High
+- **Requirements:**
+  1. Customer scans QR/uses link/enters code
+  2. If customer not registered: Complete registration first
+  3. System creates connection request with status `PendingBusinessApproval`
+  4. System sends notification to business owner/manager
+  5. Business views customer profile (name, phone, previous bookings if any)
+  6. Business approves or rejects with optional reason
+  7. System updates connection status
+  8. System notifies customer of decision
+  9. If approved: Customer can now book appointments
+
+**FR-CON-003: Approval Workflow - Business Initiates**
+- **Priority:** High
+- **Requirements:**
+  1. Business enters customer phone number
+  2. System checks if customer exists in system
+  3. If exists: Send connection request notification
+  4. If not exists: Send invitation SMS with registration link
+  5. System creates connection request with status `PendingCustomerApproval`
+  6. Customer receives notification
+  7. Customer views business profile
+  8. Customer accepts or declines
+  9. System updates connection status
+  10. System notifies business of decision
+
+**FR-CON-004: Multi-Business Connections**
+- **Priority:** High
+- **Requirements:**
+  - Customer can connect to multiple businesses
+  - Customer can view all connected businesses in one list
+  - Customer can favorite preferred businesses
+  - Customer can disconnect from business anytime
+  - Business can remove customer connection
+  - System shall maintain connection history even after disconnect
+
+**API Endpoints:**
+```
+GET /api/customers/{customerId}/connections - Get customer's connected businesses
+GET /api/tenants/{tenantId}/connections - Get business's connected customers
+POST /api/connections/request - Create connection request
+PUT /api/connections/{id}/approve - Approve connection
+PUT /api/connections/{id}/reject - Reject connection
+DELETE /api/connections/{id} - Disconnect
+PUT /api/connections/{id}/block - Block user
+GET /api/connections/{id}/history - Get connection history
+```
+
+### 7.3 Multi-Staff Management
+
+#### 7.3.1 Staff Roles and Permissions
+**FR-STAFF-001: Role Definition**
+- **Description:** System shall support granular role-based permissions
+- **Priority:** High
+- **Requirements:**
+  - System shall define 4 staff roles: Owner, Manager, Staff, Receptionist
+  - Each role shall have configurable permissions
+  - System shall support custom role creation (Enterprise plan)
+  - Permission changes shall take effect immediately
+
+**Data Model:**
+```csharp
+public class StaffMember
+{
+    public int Id { get; set; }
+    public string UserId { get; set; }
+    public int TenantId { get; set; }
+    public StaffRole Role { get; set; }
+    public string FirstName { get; set; }
+    public string LastName { get; set; }
+    public string Email { get; set; }
+    public string PhoneNumber { get; set; }
+    public string ProfilePictureUrl { get; set; }
+    public string Title { get; set; } // "Senior Stylist", "Master Barber"
+    public string Bio { get; set; }
+    public List<string> Specialties { get; set; } // ["Haircut", "Coloring"]
+    public List<int> ServiceIds { get; set; } // Services this staff can provide
+    public decimal CommissionRate { get; set; } // Percentage
+    public bool IsActive { get; set; }
+    public bool IsVisibleToCustomers { get; set; }
+    public DateTime HireDate { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public enum StaffRole
+{
+    Owner,
+    Manager,
+    Staff,
+    Receptionist
+}
+
+public class RolePermissions
+{
+    public StaffRole Role { get; set; }
+    public bool CanManageStaff { get; set; }
+    public bool CanManageServices { get; set; }
+    public bool CanManageCustomers { get; set; }
+    public bool CanViewAllAppointments { get; set; }
+    public bool CanCreateAppointments { get; set; }
+    public bool CanModifyAllAppointments { get; set; }
+    public bool CanCancelAppointments { get; set; }
+    public bool CanViewReports { get; set; }
+    public bool CanViewFinancials { get; set; }
+    public bool CanManageSettings { get; set; }
+    public bool CanProcessPayments { get; set; }
+    public bool CanManageSubscription { get; set; }
+}
+```
+
+**Permission Matrix:**
+| Permission | Owner | Manager | Staff | Receptionist |
+|---|---|---|---|---|
+| Manage Staff | ✓ | ✓ | ✗ | ✗ |
+| Manage Services | ✓ | ✓ | ✗ | ✗ |
+| Manage Customers | ✓ | ✓ | ✗ | ✓ |
+| View All Appointments | ✓ | ✓ | ✗ | ✓ |
+| Create Appointments | ✓ | ✓ | Own only | ✓ |
+| Modify Appointments | ✓ | ✓ | Own only | ✓ |
+| Cancel Appointments | ✓ | ✓ | Own only | ✓ |
+| View Reports | ✓ | ✓ | Own only | ✗ |
+| View Financials | ✓ | ✗ | ✗ | ✗ |
+| Manage Settings | ✓ | ✗ | ✗ | ✗ |
+| Process Payments | ✓ | ✓ | ✗ | ✓ |
+| Manage Subscription | ✓ | ✗ | ✗ | ✗ |
+
+#### 7.3.2 Staff Schedule Management
+**FR-STAFF-010: Working Hours Configuration**
+- **Description:** Define staff availability schedules
+- **Priority:** High
+- **Requirements:**
+  - System shall allow per-staff working hours configuration
+  - System shall support different hours per day of week
+  - System shall support irregular schedules
+  - System shall support multiple shifts per day
+  - System shall validate time overlaps
+
+**Data Model:**
+```csharp
+public class StaffWorkingHours
+{
+    public int Id { get; set; }
+    public int StaffId { get; set; }
+    public DayOfWeek DayOfWeek { get; set; }
+    public TimeSpan StartTime { get; set; }
+    public TimeSpan EndTime { get; set; }
+    public bool IsWorkingDay { get; set; }
+    public List<BreakTime> Breaks { get; set; }
+}
+
+public class BreakTime
+{
+    public TimeSpan StartTime { get; set; }
+    public TimeSpan EndTime { get; set; }
+    public string Description { get; set; } // "Lunch", "Coffee Break"
+}
+
+public class StaffTimeOff
+{
+    public int Id { get; set; }
+    public int StaffId { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
+    public TimeOffType Type { get; set; }
+    public string Reason { get; set; }
+    public TimeOffStatus Status { get; set; }
+    public string ApprovedByUserId { get; set; }
+    public DateTime? ApprovedAt { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public enum TimeOffType
+{
+    Vacation,
+    SickLeave,
+    PersonalLeave,
+    Emergency,
+    Training
+}
+
+public enum TimeOffStatus
+{
+    Pending,
+    Approved,
+    Rejected,
+    Cancelled
+}
+
+public class StaffTimeBlock
+{
+    public int Id { get; set; }
+    public int StaffId { get; set; }
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
+    public string Reason { get; set; }
+    public bool IsRecurring { get; set; }
+    public RecurrencePattern RecurrencePattern { get; set; }
+}
+```
+
+**FR-STAFF-011: Calendar Visibility Settings**
+- **Description:** Control staff calendar visibility to customers
+- **Priority:** High
+- **Requirements:**
+  - Owner shall configure per-staff visibility settings
+  - Options: Fully Visible, Hidden, Service-Specific
+  - System shall respect visibility during booking flow
+  - Hidden staff shall not appear in customer selection
+  - System shall still allow manual assignment by owner/manager
+
+#### 7.3.3 Staff Assignment Strategies
+**FR-STAFF-020: Customer Booking Flow Modes**
+- **Description:** Different ways customers can select staff
+- **Priority:** High
+- **Requirements:**
+  - System shall support 4 booking modes (configurable per tenant):
+    1. **Staff-First Mode:** Customer selects staff, then sees availability
+    2. **Service-First Mode:** Customer selects service, system shows available staff
+    3. **Auto-Assignment Mode:** System assigns staff automatically based on availability/load
+    4. **Any Available Mode:** Customer requests appointment, first available staff assigned
+
+**Business Rules:**
+```csharp
+public class TenantBookingSettings
+{
+    public int TenantId { get; set; }
+    public BookingMode BookingMode { get; set; }
+    public StaffAssignmentStrategy AssignmentStrategy { get; set; } // RoundRobin, LeastBusy, Random
+    public bool AllowCustomerStaffPreference { get; set; }
+    public bool AllowStaffChange { get; set; }
+    public bool ShowStaffPriceVariations { get; set; }
+}
+
+public enum BookingMode
+{
+    StaffFirst,
+    ServiceFirst,
+    AutoAssignment,
+    AnyAvailable
+}
+
+public enum StaffAssignmentStrategy
+{
+    RoundRobin, // Distribute evenly
+    LeastBusy, // Assign to staff with fewest bookings
+    Random,
+    Priority // Based on staff seniority/ratings
+}
+```
+
+**API Endpoints:**
+```
+GET /api/tenants/{tenantId}/staff - List all staff
+POST /api/tenants/{tenantId}/staff - Add staff member
+PUT /api/staff/{id} - Update staff details
+DELETE /api/staff/{id} - Remove staff (soft delete)
+GET /api/staff/{id}/schedule - Get staff schedule
+PUT /api/staff/{id}/schedule - Update working hours
+POST /api/staff/{id}/time-off - Request time off
+GET /api/staff/{id}/availability - Check availability
+POST /api/staff/{id}/time-blocks - Create time block
+GET /api/staff/{id}/appointments - Get staff appointments
+GET /api/staff/{id}/performance - Get performance metrics
+```
+
+### 7.4 Advanced Appointment Booking
+
+#### 7.4.1 Booking Request System
+**FR-BOOK-001: Request-Based Booking**
+- **Description:** Customer sends booking request, business approves
+- **Priority:** High
+- **Requirements:**
+  - Customer shall select service, preferred date/time, staff preference
+  - System shall create appointment with status `PendingApproval`
+  - System shall notify business (in-app + email + SMS)
+  - Business shall review within 24 hours
+  - Business can: Approve, Reject, or Propose Alternative
+  - System shall notify customer of decision
+  - Auto-reject if no response within 48 hours
+
+**Data Model:**
+```csharp
+public class AppointmentRequest
+{
+    public int Id { get; set; }
+    public string CustomerId { get; set; }
+    public int TenantId { get; set; }
+    public int? PreferredStaffId { get; set; }
+    public List<int> ServiceIds { get; set; }
+    public DateTime PreferredDateTime { get; set; }
+    public DateTime? AlternativeDateTime1 { get; set; }
+    public DateTime? AlternativeDateTime2 { get; set; }
+    public string CustomerNotes { get; set; }
+    public AppointmentRequestStatus Status { get; set; }
+    public string ResponseNotes { get; set; }
+    public DateTime? ProposedDateTime { get; set; }
+    public DateTime RequestedAt { get; set; }
+    public DateTime? RespondedAt { get; set; }
+    public string RespondedByUserId { get; set; }
+}
+
+public enum AppointmentRequestStatus
+{
+    Pending,
+    Approved,
+    Rejected,
+    Expired,
+    CustomerCancelled
+}
+```
+
+**FR-BOOK-002: Direct Booking with Slot Reservation**
+- **Description:** Real-time availability booking with temporary hold
+- **Priority:** High
+- **Requirements:**
+  - System shall display real-time available time slots
+  - Customer shall select slot
+  - System shall reserve slot for 10 minutes
+  - Reserved slots shall show as "Being reserved" to other customers
+  - System shall countdown remaining reservation time
+  - Customer must complete booking within 10 minutes
+  - System shall auto-release slot if not completed
+  - Completed booking shall mark slot as booked
+
+**Data Model:**
+```csharp
+public class SlotReservation
+{
+    public int Id { get; set; }
+    public string CustomerId { get; set; }
+    public int TenantId { get; set; }
+    public int StaffId { get; set; }
+    public DateTime SlotStartTime { get; set; }
+    public DateTime SlotEndTime { get; set; }
+    public DateTime ReservedAt { get; set; }
+    public DateTime ExpiresAt { get; set; } // ReservedAt + 10 minutes
+    public bool IsCompleted { get; set; }
+    public int? AppointmentId { get; set; } // Set when booking completed
+}
+```
+
+**Business Logic:**
+```csharp
+// Pseudo-code for availability check
+public async Task<List<TimeSlot>> GetAvailableSlots(
+    int tenantId,
+    int serviceId,
+    int? staffId,
+    DateTime date)
+{
+    // 1. Get business working hours for date
+    // 2. Get staff working hours (if specified)
+    // 3. Get existing appointments
+    // 4. Get active slot reservations
+    // 5. Get time blocks
+    // 6. Calculate service duration
+    // 7. Generate available slots
+    // 8. Filter out reserved slots
+    // 9. Return available slots
+}
+```
+
+#### 7.4.2 Booking Policies Engine
+**FR-BOOK-010: Policy Configuration**
+- **Description:** Configurable booking rules per tenant
+- **Priority:** High
+- **Requirements:**
+  - System shall enforce booking policies
+  - Policies shall be configurable per tenant
+  - System shall validate bookings against policies
+  - Policy violations shall prevent booking with clear error message
+
+**Data Model:**
+```csharp
+public class BookingPolicy
+{
+    public int Id { get; set; }
+    public int TenantId { get; set; }
+    
+    // Advance booking rules
+    public int MinimumAdvanceHours { get; set; } // e.g., 2
+    public int MaximumAdvanceDays { get; set; } // e.g., 90
+    public bool AllowSameDayBooking { get; set; }
+    
+    // Cancellation rules
+    public int CancellationDeadlineHours { get; set; } // e.g., 24
+    public bool ChargeCancellationFee { get; set; }
+    public decimal CancellationFeeAmount { get; set; }
+    public CancellationFeeType CancellationFeeType { get; set; } // Fixed, Percentage
+    
+    // Rescheduling rules
+    public int ReschedulingDeadlineHours { get; set; }
+    public int MaxReschedulesPerBooking { get; set; }
+    public bool ChargeRescheduleFee { get; set; }
+    public decimal RescheduleFeeAmount { get; set; }
+    
+    // No-show rules
+    public int NoShowGracePeriodMinutes { get; set; } // e.g., 15
+    public bool ChargeNoShowFee { get; set; }
+    public decimal NoShowFeeAmount { get; set; }
+    public int MaxNoShowsBeforeBlock { get; set; } // e.g., 3
+    public bool RequireDepositAfterNoShow { get; set; }
+    
+    // Other rules
+    public int BufferTimeBetweenAppointments { get; set; } // minutes
+    public bool AllowDoubleBooking { get; set; }
+    public bool RequirePhoneVerification { get; set; }
+    public bool RequireDepositForFirstBooking { get; set; }
+    
+    public DateTime UpdatedAt { get; set; }
+}
+
+public enum CancellationFeeType
+{
+    Fixed,
+    Percentage
+}
+```
+
+**FR-BOOK-011: Policy Validation**
+- **Requirements:**
+  - Validate minimum advance time: `BookingTime >= Now + MinimumAdvanceHours`
+  - Validate maximum advance time: `BookingTime <= Now + MaximumAdvanceDays`
+  - Validate cancellation deadline: `Now <= BookingTime - CancellationDeadlineHours`
+  - Check customer no-show history before allowing booking
+  - Enforce deposit requirement if policy requires
+
+**Policy Display to Customers:**
+```
+Example Policy Display:
+"Randevu Politikası:
+- Randevu en az 2 saat önceden alınmalıdır
+- En fazla 3 ay sonrası için randevu alınabilir
+- İptal için randevudan en az 24 saat önce bildirim yapılmalıdır
+- Geç iptal durumunda ₺50 ücret tahsil edilir
+- 3 no-show durumunda hesap askıya alınır"
+```
+
+#### 7.4.3 Multi-Service Booking
+**FR-BOOK-020: Combined Service Booking**
+- **Description:** Book multiple services in single appointment
+- **Priority:** Medium
+- **Requirements:**
+  - Customer shall select multiple services
+  - System shall calculate total duration (sum of service durations + buffer time)
+  - System shall check staff availability for entire duration
+  - System shall support sequential services (Service A → Service B)
+  - System shall calculate total price
+  - System shall apply package discounts if applicable
+
+**Data Model:**
+```csharp
+public class Appointment
+{
+    public int Id { get; set; }
+    public int TenantId { get; set; }
+    public string CustomerId { get; set; }
+    public int StaffId { get; set; }
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
+    public List<AppointmentService> Services { get; set; }
+    public decimal TotalPrice { get; set; }
+    public decimal DiscountAmount { get; set; }
+    public decimal FinalPrice { get; set; }
+    public AppointmentStatus Status { get; set; }
+    public string CustomerNotes { get; set; }
+    public string StaffNotes { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public string CancellationReason { get; set; }
+    public DateTime? CancelledAt { get; set; }
+    public string CancelledByUserId { get; set; }
+}
+
+public class AppointmentService
+{
+    public int Id { get; set; }
+    public int AppointmentId { get; set; }
+    public int ServiceId { get; set; }
+    public int DurationMinutes { get; set; }
+    public decimal Price { get; set; }
+    public int SequenceOrder { get; set; }
+    public bool IsCompleted { get; set; }
+}
+
+public enum AppointmentStatus
+{
+    PendingApproval,
+    Confirmed,
+    InProgress,
+    Completed,
+    Cancelled,
+    NoShow,
+    Rescheduled
+}
+```
+
+#### 7.4.4 Group Booking
+**FR-BOOK-030: Group Appointments**
+- **Description:** Book for multiple people simultaneously
+- **Priority:** Low
+- **Requirements:**
+  - Coordinator shall create group booking
+  - Coordinator shall specify number of people
+  - Each person can have different services
+  - System shall check staff availability for all people
+  - System shall assign different staff if needed
+  - All appointments shall have same start time (or staggered)
+  - Group discount shall apply
+  - All members shall receive separate notifications
+  - Coordinator can manage entire group booking
+
+**Data Model:**
+```csharp
+public class GroupBooking
+{
+    public int Id { get; set; }
+    public int TenantId { get; set; }
+    public string CoordinatorCustomerId { get; set; }
+    public string GroupName { get; set; } // e.g., "Jane's Bridal Party"
+    public int NumberOfPeople { get; set; }
+    public DateTime PreferredDateTime { get; set; }
+    public decimal TotalPrice { get; set; }
+    public decimal GroupDiscount { get; set; }
+    public List<int> AppointmentIds { get; set; } // Individual appointments
+    public GroupBookingStatus Status { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public enum GroupBookingStatus
+{
+    Pending,
+    Confirmed,
+    PartiallyCompleted,
+    Completed,
+    Cancelled
+}
+```
+
+**API Endpoints:**
+```
+POST /api/appointments/request - Create appointment request
+POST /api/appointments/direct - Direct booking
+POST /api/appointments/slots/reserve - Reserve time slot
+GET /api/appointments/availability - Get available slots
+PUT /api/appointments/{id}/approve - Approve request
+PUT /api/appointments/{id}/reject - Reject request
+PUT /api/appointments/{id}/propose - Propose alternative
+POST /api/appointments/group - Create group booking
+GET /api/appointments/{id} - Get appointment details
+PUT /api/appointments/{id} - Update appointment
+DELETE /api/appointments/{id}/cancel - Cancel appointment
+PUT /api/appointments/{id}/reschedule - Reschedule appointment
+PUT /api/appointments/{id}/check-in - Mark customer checked in
+PUT /api/appointments/{id}/no-show - Mark as no-show
+PUT /api/appointments/{id}/complete - Mark as completed
+```
+
+### 7.5 Package and Session Management
+
+#### 7.5.1 Package Definition and Configuration
+**FR-PKG-001: Package Creation**
+- **Description:** Create service packages with multiple sessions
+- **Priority:** High
+- **Requirements:**
+  - Business shall define package name and description
+  - Business shall select services included (single or multiple)
+  - Business shall specify number of sessions per service
+  - Business shall set package price (discounted from individual prices)
+  - Business shall set validity period (days)
+  - Business shall configure usage restrictions
+  - System shall calculate and display savings amount
+
+**Data Model:**
+```csharp
+public class ServicePackage
+{
+    public int Id { get; set; }
+    public int TenantId { get; set; }
+    public string Name { get; set; } // "10 Session Laser Package"
+    public string Description { get; set; }
+    public PackageType Type { get; set; }
+    public List<PackageService> Services { get; set; }
+    public decimal OriginalPrice { get; set; } // Sum of individual prices
+    public decimal PackagePrice { get; set; } // Discounted price
+    public decimal DiscountPercentage { get; set; }
+    public int ValidityDays { get; set; } // 90, 180, 365
+    public int MaxUsesPerWeek { get; set; } // 0 = unlimited
+    public int MaxUsesPerMonth { get; set; } // 0 = unlimited
+    public bool IsActive { get; set; }
+    public bool IsRefundable { get; set; }
+    public bool IsTransferable { get; set; }
+    public string Terms { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public enum PackageType
+{
+    MultiSession, // Same service multiple times
+    MixedService, // Different services bundled
+    Unlimited, // Unlimited within time period
+    Membership // Recurring subscription
+}
+
+public class PackageService
+{
+    public int Id { get; set; }
+    public int ServicePackageId { get; set; }
+    public int ServiceId { get; set; }
+    public int Quantity { get; set; } // Number of sessions
+    public decimal IndividualPrice { get; set; }
+}
+```
+
+#### 7.5.2 Package Purchase and Payment
+**FR-PKG-010: Package Purchase Flow**
+- **Description:** Customer purchases package
+- **Priority:** High
+- **Requirements:**
+  - Customer shall view available packages
+  - System shall display package details, services, savings
+  - Customer shall select payment option: Full, Installments, Deposit
+  - System shall process payment
+  - System shall create customer package record
+  - System shall send confirmation email with package details
+  - System shall activate package immediately after payment
+
+**Data Model:**
+```csharp
+public class CustomerPackage
+{
+    public int Id { get; set; }
+    public string CustomerId { get; set; }
+    public int TenantId { get; set; }
+    public int ServicePackageId { get; set; }
+    public DateTime PurchaseDate { get; set; }
+    public DateTime ExpiryDate { get; set; } // PurchaseDate + ValidityDays
+    public PackagePaymentType PaymentType { get; set; }
+    public decimal TotalAmount { get; set; }
+    public decimal AmountPaid { get; set; }
+    public decimal AmountDue { get; set; }
+    public List<CustomerPackageService> Services { get; set; }
+    public CustomerPackageStatus Status { get; set; }
+    public bool IsExpired { get; set; }
+    public int DaysUntilExpiry { get; set; }
+    public string PurchaseInvoiceId { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public enum PackagePaymentType
+{
+    FullPayment,
+    Installments,
+    Deposit
+}
+
+public enum CustomerPackageStatus
+{
+    Active,
+    Suspended,
+    Expired,
+    Cancelled,
+    Completed
+}
+
+public class CustomerPackageService
+{
+    public int Id { get; set; }
+    public int CustomerPackageId { get; set; }
+    public int ServiceId { get; set; }
+    public int TotalSessions { get; set; }
+    public int UsedSessions { get; set; }
+    public int RemainingSessions { get; set; }
+    public List<PackageSessionUsage> UsageHistory { get; set; }
+}
+
+public class PackageSessionUsage
+{
+    public int Id { get; set; }
+    public int CustomerPackageServiceId { get; set; }
+    public int AppointmentId { get; set; }
+    public DateTime UsedAt { get; set; }
+    public int StaffId { get; set; }
+    public string Notes { get; set; }
+}
+```
+
+**FR-PKG-011: Installment Payment**
+- **Description:** Pay for package in installments
+- **Priority:** High
+- **Requirements:**
+  - Customer shall select installment plan (2, 3, 4, 6, 12 months)
+  - System shall calculate monthly payment amount
+  - First installment shall be due immediately
+  - System shall auto-charge on due dates
+  - System shall send payment reminders 3 days before due date
+  - Late payment shall incur fee
+  - System shall suspend package if payment 30 days overdue
+  - Customer shall be able to pay remaining balance early
+
+**Data Model:**
+```csharp
+public class PackageInstallmentPlan
+{
+    public int Id { get; set; }
+    public int CustomerPackageId { get; set; }
+    public int NumberOfInstallments { get; set; }
+    public decimal InstallmentAmount { get; set; }
+    public int DayOfMonthForPayment { get; set; }
+    public List<Installment> Installments { get; set; }
+    public InstallmentPlanStatus Status { get; set; }
+}
+
+public class Installment
+{
+    public int Id { get; set; }
+    public int InstallmentPlanId { get; set; }
+    public int InstallmentNumber { get; set; }
+    public decimal Amount { get; set; }
+    public DateTime DueDate { get; set; }
+    public DateTime? PaidDate { get; set; }
+    public string PaymentTransactionId { get; set; }
+    public InstallmentStatus Status { get; set; }
+}
+
+public enum InstallmentStatus
+{
+    Pending,
+    Paid,
+    Overdue,
+    Failed,
+    Waived
+}
+```
+
+#### 7.5.3 Session Tracking and Usage
+**FR-PKG-020: Automatic Session Deduction**
+- **Description:** Track package usage automatically
+- **Priority:** High
+- **Requirements:**
+  - When appointment is completed, system shall check if customer has active package
+  - If package covers the service, system shall deduct one session
+  - System shall update remaining sessions count
+  - System shall log usage with timestamp, staff, appointment details
+  - Customer shall receive notification of remaining sessions
+  - System shall notify when sessions are running low (e.g., 2 remaining)
+
+**FR-PKG-021: Manual Session Adjustment**
+- **Description:** Business can manually adjust sessions
+- **Priority:** Medium
+- **Requirements:**
+  - Business owner/manager can add or remove sessions
+  - Reason must be provided for adjustment
+  - System shall log adjustment with user, timestamp, reason
+  - Customer shall be notified of adjustment
+
+**FR-PKG-022: Package Expiry Management**
+- **Description:** Handle package expiration
+- **Priority:** High
+- **Requirements:**
+  - System shall check package expiry daily (background job)
+  - System shall send notifications: 30, 15, 7, 3, 1 days before expiry
+  - Expired packages shall be marked as expired
+  - Unused sessions in expired packages cannot be used
+  - Customer can request extension (business approval required)
+  - Business can set extension fee
+  - System shall maintain history of expired packages
+
+**API Endpoints:**
+```
+GET /api/packages - List available packages
+POST /api/packages - Create package (business)
+PUT /api/packages/{id} - Update package
+DELETE /api/packages/{id} - Deactivate package
+GET /api/customers/{customerId}/packages - Get customer's packages
+POST /api/customers/{customerId}/packages/{packageId}/purchase - Purchase package
+GET /api/customer-packages/{id} - Get package details
+GET /api/customer-packages/{id}/usage-history - Get session usage history
+POST /api/customer-packages/{id}/use-session - Manually deduct session
+PUT /api/customer-packages/{id}/adjust-sessions - Adjust sessions
+POST /api/customer-packages/{id}/extend - Request extension
+PUT /api/customer-packages/{id}/cancel - Cancel package
+GET /api/customer-packages/{id}/installments - Get installment schedule
+POST /api/installments/{id}/pay - Make installment payment
+```
+
+### 7.6 Payment Integration
+
+#### 7.6.1 Payment Provider Integration
+**FR-PAY-001: PayTR Integration**
+- **Description:** Integrate PayTR for payment processing
+- **Priority:** High
+- **Requirements:**
+  - System shall integrate PayTR API
+  - Support credit/debit card payments
+  - Support 3D Secure authentication
+  - Generate payment iframe
+  - Handle payment callbacks/webhooks
+  - Store transaction IDs
+  - Handle refunds via API
+
+**FR-PAY-002: QR Code Payment**
+- **Description:** Generate QR codes for payment
+- **Priority:** Medium
+- **Requirements:**
+  - System shall generate payment QR code
+  - QR code shall encode payment amount, merchant info
+  - Customer shall scan with banking app
+  - System shall receive payment confirmation webhook
+  - System shall update payment status in real-time
+
+**Data Model:**
+```csharp
+public class Payment
+{
+    public int Id { get; set; }
+    public int TenantId { get; set; }
+    public string CustomerId { get; set; }
+    public int? AppointmentId { get; set; }
+    public int? CustomerPackageId { get; set; }
+    public decimal Amount { get; set; }
+    public string Currency { get; set; } // TRY
+    public PaymentMethod Method { get; set; }
+    public PaymentStatus Status { get; set; }
+    public string TransactionId { get; set; } // From payment gateway
+    public string PaymentGateway { get; set; } // PayTR, iyzico, etc.
+    public DateTime CreatedAt { get; set; }
+    public DateTime? CompletedAt { get; set; }
+    public string FailureReason { get; set; }
+    public string ReceiptUrl { get; set; }
+    public int? RefundedPaymentId { get; set; }
+}
+
+public enum PaymentMethod
+{
+    CreditCard,
+    DebitCard,
+    BankTransfer,
+    Cash,
+    QRCode,
+    Wallet,
+    GiftCard
+}
+
+public enum PaymentStatus
+{
+    Pending,
+    Processing,
+    Completed,
+    Failed,
+    Refunded,
+    PartiallyRefunded,
+    Cancelled
+}
+```
+
+### 7.7 Notification System
+
+#### 7.7.1 Multi-Channel Notifications
+**FR-NOT-001: Notification Delivery**
+- **Description:** Send notifications via multiple channels
+- **Priority:** High
+- **Requirements:**
+  - System shall support SMS, Email, Push, In-App notifications
+  - User shall configure notification preferences
+  - System shall respect user preferences
+  - System shall queue notifications for async processing
+  - System shall retry failed notifications (up to 3 attempts)
+  - System shall log all notification attempts
+
+**Data Model:**
+```csharp
+public class NotificationTemplate
+{
+    public int Id { get; set; }
+    public NotificationType Type { get; set; }
+    public NotificationChannel Channel { get; set; }
+    public string Subject { get; set; } // For email
+    public string Body { get; set; } // Template with placeholders
+    public string Language { get; set; } // tr, en
+    public bool IsActive { get; set; }
+}
+
+public enum NotificationType
+{
+    BookingConfirmation,
+    BookingReminder24h,
+    BookingReminder2h,
+    BookingCancelled,
+    BookingRescheduled,
+    BookingRequestReceived,
+    BookingRequestApproved,
+    BookingRequestRejected,
+    PaymentReceived,
+    PaymentFailed,
+    PackagePurchased,
+    PackageExpiring,
+    PackageExpired,
+    SessionUsed,
+    InstallmentDue,
+    InstallmentOverdue,
+    NoShowRecorded,
+    ReviewRequest,
+    PromotionalMessage
+}
+
+public enum NotificationChannel
+{
+    SMS,
+    Email,
+    Push,
+    InApp
+}
+
+public class NotificationQueue
+{
+    public int Id { get; set; }
+    public NotificationType Type { get; set; }
+    public NotificationChannel Channel { get; set; }
+    public string RecipientId { get; set; }
+    public string RecipientContact { get; set; } // Phone or email
+    public string Subject { get; set; }
+    public string Body { get; set; }
+    public NotificationStatus Status { get; set; }
+    public int AttemptCount { get; set; }
+    public DateTime ScheduledFor { get; set; }
+    public DateTime? SentAt { get; set; }
+    public string FailureReason { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public enum NotificationStatus
+{
+    Queued,
+    Sending,
+    Sent,
+    Failed,
+    Cancelled
+}
+```
+
+**FR-NOT-002: Custom Notification Sounds**
+- **Description:** Play custom sounds for notifications
+- **Priority:** Low
+- **Requirements:**
+  - Business app shall play "scissors sound" for new appointment
+  - Business app shall play "cash register sound" for payment
+  - Sounds shall be configurable
+  - Business can upload custom sounds
+  - Customer app shall use standard notification sounds
+
+**FR-NOT-003: Google Calendar Integration**
+- **Description:** Sync appointments to Google Calendar
+- **Priority:** Medium
+- **Requirements:**
+  - User shall connect Google account (OAuth)
+  - System shall create calendar events for appointments
+  - Two-way sync: changes in Google Calendar reflect in system
+  - System shall handle event updates and deletions
+  - System shall add calendar reminders
+  - System shall color-code events by status
+
+### 7.8 Cancellation and Modification
+
+#### 7.8.1 Cancellation Rules Enforcement
+**FR-CAN-001: Cancellation Validation**
+- **Description:** Enforce cancellation policies
+- **Priority:** High
+- **Requirements:**
+  - System shall check cancellation deadline before allowing cancellation
+  - If within deadline: Free cancellation
+  - If past deadline: Show warning and fee amount
+  - Customer must confirm fee charge
+  - System shall process cancellation fee payment
+  - Customer must provide reason (minimum 25 characters)
+  - System shall validate reason length
+  - System shall save cancellation details
+
+**FR-CAN-002: Cancellation Reason Validation**
+- **Description:** Require meaningful cancellation reasons
+- **Priority:** High
+- **Requirements:**
+  - Cancellation reason field must be at least 25 characters
+  - System shall show character count
+  - System shall prevent submission if too short
+  - Reason categories: Personal, Emergency, Schedule Conflict, Dissatisfied, Other
+  - For "Other", detailed explanation required
+
+**FR-CAN-003: No-Show Tracking**
+- **Description:** Track and manage no-shows
+- **Priority:** High
+- **Requirements:**
+  - System shall mark appointment as no-show if customer doesn't arrive within grace period
+  - System shall increment customer no-show count
+  - After 3 no-shows: Customer flagged for review
+  - System shall send warning notification
+  - Further bookings may require deposit or approval
+  - Customer can dispute no-show with evidence
+
+**Data Model:**
+```csharp
+public class AppointmentCancellation
+{
+    public int Id { get; set; }
+    public int AppointmentId { get; set; }
+    public string CancelledByUserId { get; set; }
+    public CancellationInitiator CancelledBy { get; set; }
+    public DateTime CancelledAt { get; set; }
+    public string Reason { get; set; } // Minimum 25 characters
+    public CancellationReasonCategory Category { get; set; }
+    public bool IsLateCancellation { get; set; }
+    public decimal CancellationFee { get; set; }
+    public bool FeeCharged { get; set; }
+    public string CompensationOffered { get; set; } // If business cancels
+}
+
+public enum CancellationInitiator
+{
+    Customer,
+    Business,
+    System
+}
+
+public enum CancellationReasonCategory
+{
+    Personal,
+    Emergency,
+    ScheduleConflict,
+    Dissatisfied,
+    Other
+}
+
+public class CustomerNoShowHistory
+{
+    public int Id { get; set; }
+    public string CustomerId { get; set; }
+    public int TenantId { get; set; }
+    public int NoShowCount { get; set; }
+    public DateTime? LastNoShowDate { get; set; }
+    public bool IsBlocked { get; set; }
+    public bool RequiresDepositForBooking { get; set; }
+    public DateTime? BlockedUntil { get; set; }
+}
+```
+
+**API Endpoints:**
+```
+DELETE /api/appointments/{id}/cancel - Cancel appointment
+POST /api/appointments/{id}/cancellation/reason - Submit cancellation reason
+PUT /api/appointments/{id}/no-show - Mark as no-show
+POST /api/appointments/{id}/no-show/dispute - Dispute no-show
+GET /api/customers/{customerId}/no-show-history - Get no-show history
+```
+
+---
+
 ## Appendices
 
 ### Appendix A: Glossary

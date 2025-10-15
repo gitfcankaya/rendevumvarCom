@@ -284,4 +284,141 @@ public class ServicesController : ControllerBase
             return StatusCode(500, "Bir hata oluştu");
         }
     }
+
+    /// <summary>
+    /// Get services by salon ID
+    /// </summary>
+    [HttpGet("salon/{salonId}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetServicesBySalon(Guid salonId)
+    {
+        try
+        {
+            var tenantId = GetTenantId();
+            if (tenantId == Guid.Empty)
+            {
+                // For public access, get services without tenant filtering in service layer
+                return BadRequest("Geçersiz tenant bilgisi");
+            }
+
+            var services = await _serviceService.GetServicesBySalonIdAsync(salonId, tenantId);
+            return Ok(services);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting services for salon {SalonId}", salonId);
+            return StatusCode(500, "Bir hata oluştu");
+        }
+    }
+
+    /// <summary>
+    /// Get service with assigned staff
+    /// </summary>
+    [HttpGet("{id}/staff")]
+    public async Task<IActionResult> GetServiceWithStaff(Guid id)
+    {
+        try
+        {
+            var tenantId = GetTenantId();
+            if (tenantId == Guid.Empty)
+            {
+                return BadRequest("Geçersiz tenant bilgisi");
+            }
+
+            var service = await _serviceService.GetServiceWithStaffAsync(id, tenantId);
+            if (service == null)
+            {
+                return NotFound("Hizmet bulunamadı");
+            }
+
+            return Ok(service);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting service with staff. ServiceId: {ServiceId}", id);
+            return StatusCode(500, "Bir hata oluştu");
+        }
+    }
+
+    /// <summary>
+    /// Assign staff to service
+    /// </summary>
+    [HttpPost("{serviceId}/staff/{staffId}")]
+    public async Task<IActionResult> AssignStaffToService(Guid serviceId, Guid staffId)
+    {
+        try
+        {
+            var tenantId = GetTenantId();
+            if (tenantId == Guid.Empty)
+            {
+                return BadRequest("Geçersiz tenant bilgisi");
+            }
+
+            await _serviceService.AssignStaffToServiceAsync(serviceId, staffId, tenantId);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Error assigning staff {StaffId} to service {ServiceId}", staffId, serviceId);
+            return NotFound(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error assigning staff {StaffId} to service {ServiceId}", staffId, serviceId);
+            return StatusCode(500, "Bir hata oluştu");
+        }
+    }
+
+    /// <summary>
+    /// Remove staff from service
+    /// </summary>
+    [HttpDelete("{serviceId}/staff/{staffId}")]
+    public async Task<IActionResult> RemoveStaffFromService(Guid serviceId, Guid staffId)
+    {
+        try
+        {
+            var tenantId = GetTenantId();
+            if (tenantId == Guid.Empty)
+            {
+                return BadRequest("Geçersiz tenant bilgisi");
+            }
+
+            await _serviceService.RemoveStaffFromServiceAsync(serviceId, staffId, tenantId);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Error removing staff {StaffId} from service {ServiceId}", staffId, serviceId);
+            return NotFound(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error removing staff {StaffId} from service {ServiceId}", staffId, serviceId);
+            return StatusCode(500, "Bir hata oluştu");
+        }
+    }
+
+    /// <summary>
+    /// Get staff assigned to a service
+    /// </summary>
+    [HttpGet("{serviceId}/staff/list")]
+    public async Task<IActionResult> GetServiceStaff(Guid serviceId)
+    {
+        try
+        {
+            var tenantId = GetTenantId();
+            if (tenantId == Guid.Empty)
+            {
+                return BadRequest("Geçersiz tenant bilgisi");
+            }
+
+            var staff = await _serviceService.GetServiceStaffAsync(serviceId, tenantId);
+            return Ok(staff);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting staff for service {ServiceId}", serviceId);
+            return StatusCode(500, "Bir hata oluştu");
+        }
+    }
 }

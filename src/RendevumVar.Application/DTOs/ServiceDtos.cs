@@ -10,6 +10,8 @@ public class ServiceDto
     public decimal Price { get; set; }
     public int DurationMinutes { get; set; }
     public string? Category { get; set; }
+    public Guid? CategoryId { get; set; }
+    public string? CategoryName { get; set; }
     public bool IsActive { get; set; }
     public string? Notes { get; set; }
     public string? ImageUrl { get; set; }
@@ -17,6 +19,7 @@ public class ServiceDto
     public string CreatedBy { get; set; } = string.Empty;
     public DateTime UpdatedAt { get; set; }
     public string? UpdatedBy { get; set; }
+    public List<Guid>? StaffIds { get; set; }
 }
 
 public class CreateServiceDto

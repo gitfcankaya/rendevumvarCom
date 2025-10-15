@@ -2,12 +2,14 @@ namespace RendevumVar.Core.Enums;
 
 public enum SubscriptionStatus
 {
-    Active = 1,
-    Cancelled = 2,
-    Expired = 3,
+    Trialing = 1,
+    Active = 2,
+    PastDue = 3,
     Suspended = 4,
-    PendingPayment = 5,
-    FreeTrial = 6
+    Cancelled = 5,
+    Expired = 6,
+    FreeTrial = 7, // Legacy
+    PendingPayment = 8 // Legacy
 }
 
 public enum PaymentStatus

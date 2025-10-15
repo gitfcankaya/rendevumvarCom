@@ -1624,7 +1624,1046 @@ jobs:
 
 ---
 
-## 10. Appendices
+## 10. Advanced Features Architecture
+
+### 10.1 Multi-Tenant Architecture Design
+
+#### 10.1.1 Tenant Isolation Strategy
+
+**Approach: Shared Database with Row-Level Security**
+
+```
+Benefits:
+✓ Cost-effective (single database)
+✓ Easy maintenance and upgrades
+✓ Simplified backup/recovery
+✓ Resource pooling
+
+Challenges:
+× Must ensure data isolation
+× Query performance with large datasets
+× Tenant-specific customization complexity
+```
+
+**Implementation Pattern:**
+```csharp
+public abstract class BaseEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public bool IsDeleted { get; set; }
+}
+
+// Global Query Filter in DbContext
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    // Apply tenant filter to all entities
+    modelBuilder.Entity<Salon>()
+        .HasQueryFilter(s => s.TenantId == _currentTenantId);
+    
+    modelBuilder.Entity<Service>()
+        .HasQueryFilter(s => s.TenantId == _currentTenantId);
+    
+    // Repeat for all tenant-scoped entities
+}
+```
+
+**Tenant Resolution Middleware:**
+```csharp
+public class TenantResolutionMiddleware
+{
+    private readonly RequestDelegate _next;
+
+    public async Task InvokeAsync(HttpContext context, ITenantService tenantService)
+    {
+        // Method 1: Subdomain-based
+        var host = context.Request.Host.Host;
+        var subdomain = ExtractSubdomain(host); // e.g., "salonname" from "salonname.rendevumvar.com"
+        
+        // Method 2: Header-based (for API clients)
+        if (context.Request.Headers.TryGetValue("X-Tenant-Id", out var tenantId))
+        {
+            await tenantService.SetCurrentTenant(tenantId);
+        }
+        else
+        {
+            var tenant = await tenantService.GetTenantBySubdomain(subdomain);
+            if (tenant != null)
+            {
+                await tenantService.SetCurrentTenant(tenant.Id);
+            }
+        }
+        
+        await _next(context);
+    }
+}
+```
+
+#### 10.1.2 Subscription Management Architecture
+
+**Subscription State Machine:**
+```
+┌──────────┐
+│ Trialing │
+└─────┬────┘
+      │ Trial expires
+      │ Payment added
+      ▼
+┌──────────┐
+│  Active  │◄──── Payment successful
+└─────┬────┘
+      │
+      ├──► PastDue ──► Suspended ──► Cancelled
+      │     (Payment failed)  (Grace period)
+      │
+      └──► Cancelled (User cancels)
+```
+
+**Subscription Enforcement:**
+```csharp
+public class SubscriptionMiddleware
+{
+    public async Task InvokeAsync(HttpContext context, ISubscriptionService subscriptionService)
+    {
+        var tenantId = context.GetTenantId();
+        var subscription = await subscriptionService.GetCurrentSubscription(tenantId);
+        
+        // Check subscription status
+        if (subscription.Status == SubscriptionStatus.Suspended)
+        {
+            context.Response.StatusCode = 402; // Payment Required
+            await context.Response.WriteAsJsonAsync(new 
+            { 
+                error = "Subscription suspended. Please update payment method." 
+            });
+            return;
+        }
+        
+        // Check feature limits
+        if (context.Request.Path.StartsWithSegments("/api/staff"))
+        {
+            var staffCount = await subscriptionService.GetStaffCount(tenantId);
+            var maxStaff = subscription.Plan.MaxStaff;
+            
+            if (staffCount >= maxStaff && context.Request.Method == "POST")
+            {
+                context.Response.StatusCode = 403; // Forbidden
+                await context.Response.WriteAsJsonAsync(new 
+                { 
+                    error = $"Your plan allows maximum {maxStaff} staff members. Please upgrade." 
+                });
+                return;
+            }
+        }
+        
+        await _next(context);
+    }
+}
+```
+
+**Subscription Database Tables:**
+```sql
+-- Subscription Plans
+CREATE TABLE SubscriptionPlans (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    Name NVARCHAR(50) NOT NULL,
+    Description NVARCHAR(500),
+    MonthlyPrice DECIMAL(10,2) NOT NULL,
+    AnnualPrice DECIMAL(10,2) NOT NULL,
+    TrialDays INT DEFAULT 0,
+    MaxStaff INT DEFAULT -1, -- -1 = unlimited
+    MaxAppointmentsPerMonth INT DEFAULT -1,
+    HasAdvancedAnalytics BIT DEFAULT 0,
+    HasSMSNotifications BIT DEFAULT 0,
+    HasCustomBranding BIT DEFAULT 0,
+    HasAPIAccess BIT DEFAULT 0,
+    HasMultiLocation BIT DEFAULT 0,
+    HasPackageManagement BIT DEFAULT 0,
+    IsActive BIT DEFAULT 1,
+    CreatedAt DATETIME2 DEFAULT GETUTCDATE()
+);
+
+-- Tenant Subscriptions
+CREATE TABLE TenantSubscriptions (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    TenantId UNIQUEIDENTIFIER NOT NULL,
+    SubscriptionPlanId INT NOT NULL,
+    Status NVARCHAR(20) NOT NULL, -- Trialing, Active, PastDue, Suspended, Cancelled, Expired
+    BillingCycle NVARCHAR(10) NOT NULL, -- Monthly, Annual
+    StartDate DATETIME2 NOT NULL,
+    EndDate DATETIME2 NULL,
+    TrialEndDate DATETIME2 NULL,
+    NextBillingDate DATETIME2 NULL,
+    PaymentMethodId NVARCHAR(100) NULL,
+    AutoRenew BIT DEFAULT 1,
+    CreatedAt DATETIME2 DEFAULT GETUTCDATE(),
+    UpdatedAt DATETIME2 DEFAULT GETUTCDATE(),
+    FOREIGN KEY (TenantId) REFERENCES Tenants(Id),
+    FOREIGN KEY (SubscriptionPlanId) REFERENCES SubscriptionPlans(Id)
+);
+
+CREATE INDEX IX_TenantSubscriptions_TenantId ON TenantSubscriptions(TenantId);
+CREATE INDEX IX_TenantSubscriptions_Status ON TenantSubscriptions(Status);
+
+-- Invoices
+CREATE TABLE Invoices (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    InvoiceNumber NVARCHAR(20) UNIQUE NOT NULL,
+    TenantId UNIQUEIDENTIFIER NOT NULL,
+    InvoiceDate DATETIME2 NOT NULL,
+    DueDate DATETIME2 NOT NULL,
+    SubTotal DECIMAL(10,2) NOT NULL,
+    TaxAmount DECIMAL(10,2) NOT NULL,
+    TotalAmount DECIMAL(10,2) NOT NULL,
+    Status NVARCHAR(20) NOT NULL, -- Draft, Sent, Paid, Overdue, Cancelled
+    Currency NVARCHAR(3) DEFAULT 'TRY',
+    PdfUrl NVARCHAR(500) NULL,
+    PaidAt DATETIME2 NULL,
+    PaymentTransactionId NVARCHAR(100) NULL,
+    CreatedAt DATETIME2 DEFAULT GETUTCDATE(),
+    FOREIGN KEY (TenantId) REFERENCES Tenants(Id)
+);
+
+CREATE INDEX IX_Invoices_TenantId ON Invoices(TenantId);
+CREATE INDEX IX_Invoices_Status ON Invoices(Status);
+
+-- Invoice Line Items
+CREATE TABLE InvoiceLineItems (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    InvoiceId INT NOT NULL,
+    Description NVARCHAR(500) NOT NULL,
+    Quantity INT NOT NULL,
+    UnitPrice DECIMAL(10,2) NOT NULL,
+    LineTotal DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (InvoiceId) REFERENCES Invoices(Id) ON DELETE CASCADE
+);
+```
+
+### 10.2 Invitation and Connection System Architecture
+
+#### 10.2.1 Invitation Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────┐
+│            INVITATION GENERATION                    │
+└─────────────────────────────────────────────────────┘
+
+Business Dashboard
+      │
+      ├──► Generate QR Code ──► Create InvitationCode (Type=QR)
+      │                         └──► Return QR Image + URL
+      │
+      ├──► Generate Link ──────► Create InvitationCode (Type=Link)
+      │                         └──► Return Shareable URL
+      │
+      ├──► Send SMS ───────────► Create InvitationCode (Type=SMS)
+      │                         └──► Send SMS via Twilio
+      │                         └──► Track SMS delivery
+      │
+      └──► Generate Code ──────► Create InvitationCode (Type=Code)
+                                └──► Return 6-8 char code
+
+
+┌─────────────────────────────────────────────────────┐
+│         CUSTOMER ACCEPTANCE FLOW                    │
+└─────────────────────────────────────────────────────┘
+
+Customer scans QR / clicks link / enters code
+      │
+      ├──► Validate invitation token
+      │    ├──► Invalid → Error
+      │    └──► Valid → Continue
+      │
+      ├──► Check if customer registered
+      │    ├──► No → Registration Form
+      │    └──► Yes → Connection Request
+      │
+      ├──► Create CustomerBusinessConnection
+      │    └──► Status: PendingBusinessApproval
+      │
+      ├──► Notify Business Owner
+      │    └──► In-App + Email + SMS
+      │
+      └──► Await Business Response
+           ├──► Approved → Connection Active
+           └──► Rejected → Notify Customer
+```
+
+**Invitation Database Schema:**
+```sql
+-- Invitation Codes
+CREATE TABLE InvitationCodes (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    TenantId UNIQUEIDENTIFIER NOT NULL,
+    Code NVARCHAR(10) NOT NULL, -- 6-8 character code
+    Token NVARCHAR(100) UNIQUE NOT NULL, -- Secure token for URL
+    Type NVARCHAR(20) NOT NULL, -- QR, Link, SMS, Code
+    CreatedByUserId UNIQUEIDENTIFIER NOT NULL,
+    CreatedAt DATETIME2 DEFAULT GETUTCDATE(),
+    ExpiresAt DATETIME2 NULL,
+    MaxUses INT NULL,
+    UsedCount INT DEFAULT 0,
+    IsActive BIT DEFAULT 1,
+    FOREIGN KEY (TenantId) REFERENCES Tenants(Id),
+    FOREIGN KEY (CreatedByUserId) REFERENCES Users(Id)
+);
+
+CREATE INDEX IX_InvitationCodes_Token ON InvitationCodes(Token);
+CREATE INDEX IX_InvitationCodes_TenantId ON InvitationCodes(TenantId);
+
+-- Customer-Business Connections
+CREATE TABLE CustomerBusinessConnections (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    CustomerId UNIQUEIDENTIFIER NOT NULL,
+    TenantId UNIQUEIDENTIFIER NOT NULL,
+    Status NVARCHAR(30) NOT NULL, -- PendingCustomerApproval, PendingBusinessApproval, Approved, Rejected, Blocked, Disconnected
+    InitiatedBy NVARCHAR(20) NOT NULL, -- Customer, Business
+    RequestMessage NVARCHAR(500) NULL,
+    RejectionReason NVARCHAR(500) NULL,
+    RequestedAt DATETIME2 DEFAULT GETUTCDATE(),
+    RespondedAt DATETIME2 NULL,
+    LastInteractionAt DATETIME2 NULL,
+    AppointmentCount INT DEFAULT 0,
+    IsFavorite BIT DEFAULT 0,
+    CreatedAt DATETIME2 DEFAULT GETUTCDATE(),
+    UpdatedAt DATETIME2 DEFAULT GETUTCDATE(),
+    FOREIGN KEY (CustomerId) REFERENCES Users(Id),
+    FOREIGN KEY (TenantId) REFERENCES Tenants(Id)
+);
+
+CREATE INDEX IX_Connections_CustomerId ON CustomerBusinessConnections(CustomerId);
+CREATE INDEX IX_Connections_TenantId ON CustomerBusinessConnections(TenantId);
+CREATE INDEX IX_Connections_Status ON CustomerBusinessConnections(Status);
+
+-- Connection History (Audit Trail)
+CREATE TABLE ConnectionHistory (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    ConnectionId INT NOT NULL,
+    Action NVARCHAR(50) NOT NULL, -- Created, Approved, Rejected, Disconnected, Blocked
+    PerformedByUserId UNIQUEIDENTIFIER NOT NULL,
+    Notes NVARCHAR(500) NULL,
+    PerformedAt DATETIME2 DEFAULT GETUTCDATE(),
+    FOREIGN KEY (ConnectionId) REFERENCES CustomerBusinessConnections(Id)
+);
+```
+
+**Invitation Service Implementation:**
+```csharp
+public class InvitationService : IInvitationService
+{
+    public async Task<QRCodeResult> GenerateQRCodeAsync(Guid tenantId, Guid userId)
+    {
+        // Generate secure token
+        var token = GenerateSecureToken();
+        
+        // Create invitation code
+        var invitation = new InvitationCode
+        {
+            TenantId = tenantId,
+            Code = GenerateShortCode(),
+            Token = token,
+            Type = InvitationType.QR,
+            CreatedByUserId = userId,
+            IsActive = true
+        };
+        
+        await _context.InvitationCodes.AddAsync(invitation);
+        await _context.SaveChangesAsync();
+        
+        // Generate QR code image
+        var invitationUrl = $"https://rendevumvar.com/invite/{token}";
+        var qrCodeImage = _qrCodeGenerator.Generate(invitationUrl);
+        
+        // Upload to blob storage
+        var imageUrl = await _blobStorage.UploadAsync(qrCodeImage, $"qr/{token}.png");
+        
+        return new QRCodeResult
+        {
+            ImageUrl = imageUrl,
+            InvitationUrl = invitationUrl,
+            Token = token
+        };
+    }
+    
+    public async Task<InvitationValidationResult> ValidateInvitationAsync(string token)
+    {
+        var invitation = await _context.InvitationCodes
+            .Include(i => i.Tenant)
+            .FirstOrDefaultAsync(i => i.Token == token && i.IsActive);
+        
+        if (invitation == null)
+            return new InvitationValidationResult { IsValid = false, Error = "Invalid invitation" };
+        
+        // Check expiry
+        if (invitation.ExpiresAt.HasValue && invitation.ExpiresAt.Value < DateTime.UtcNow)
+            return new InvitationValidationResult { IsValid = false, Error = "Invitation expired" };
+        
+        // Check max uses
+        if (invitation.MaxUses.HasValue && invitation.UsedCount >= invitation.MaxUses.Value)
+            return new InvitationValidationResult { IsValid = false, Error = "Invitation limit reached" };
+        
+        return new InvitationValidationResult 
+        { 
+            IsValid = true, 
+            TenantId = invitation.TenantId,
+            TenantName = invitation.Tenant.Name
+        };
+    }
+    
+    private string GenerateSecureToken()
+    {
+        using var rng = RandomNumberGenerator.Create();
+        var bytes = new byte[32];
+        rng.GetBytes(bytes);
+        return Convert.ToBase64String(bytes).Replace("+", "").Replace("/", "").Replace("=", "").Substring(0, 32);
+    }
+    
+    private string GenerateShortCode()
+    {
+        // Generate 6-character code without ambiguous characters (O, 0, I, 1)
+        const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        var random = new Random();
+        return new string(Enumerable.Range(0, 6)
+            .Select(_ => chars[random.Next(chars.Length)])
+            .ToArray());
+    }
+}
+```
+
+### 10.3 Package and Session Management Architecture
+
+#### 10.3.1 Package Purchase Flow
+
+```
+Customer views packages
+        │
+        ├──► Selects package
+        │
+        ├──► Choose payment type
+        │    ├──► Full Payment ──────► Process payment ──► Activate package
+        │    ├──► Installments ──────► Create InstallmentPlan ──► First payment ──► Activate
+        │    └──► Deposit ───────────► Partial payment ──► Activate with balance due
+        │
+        ├──► Create CustomerPackage
+        │    └──► Status: Active
+        │
+        ├──► Create CustomerPackageServices
+        │    └──► TotalSessions, UsedSessions = 0, RemainingSessions = TotalSessions
+        │
+        ├──► Generate Invoice
+        │
+        └──► Send Confirmation Email
+             └──► Package details, Expiry date, Terms
+```
+
+**Package Database Schema:**
+```sql
+-- Service Packages
+CREATE TABLE ServicePackages (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    TenantId UNIQUEIDENTIFIER NOT NULL,
+    Name NVARCHAR(200) NOT NULL,
+    Description NVARCHAR(MAX) NULL,
+    Type NVARCHAR(20) NOT NULL, -- MultiSession, MixedService, Unlimited, Membership
+    OriginalPrice DECIMAL(10,2) NOT NULL,
+    PackagePrice DECIMAL(10,2) NOT NULL,
+    DiscountPercentage DECIMAL(5,2) NOT NULL,
+    ValidityDays INT NOT NULL,
+    MaxUsesPerWeek INT DEFAULT 0,
+    MaxUsesPerMonth INT DEFAULT 0,
+    IsActive BIT DEFAULT 1,
+    IsRefundable BIT DEFAULT 0,
+    IsTransferable BIT DEFAULT 0,
+    Terms NVARCHAR(MAX) NULL,
+    CreatedAt DATETIME2 DEFAULT GETUTCDATE(),
+    UpdatedAt DATETIME2 DEFAULT GETUTCDATE(),
+    FOREIGN KEY (TenantId) REFERENCES Tenants(Id)
+);
+
+-- Package Services (What's included in package)
+CREATE TABLE PackageServices (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    ServicePackageId INT NOT NULL,
+    ServiceId UNIQUEIDENTIFIER NOT NULL,
+    Quantity INT NOT NULL, -- Number of sessions
+    IndividualPrice DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (ServicePackageId) REFERENCES ServicePackages(Id) ON DELETE CASCADE,
+    FOREIGN KEY (ServiceId) REFERENCES Services(Id)
+);
+
+-- Customer Packages (Purchased packages)
+CREATE TABLE CustomerPackages (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    CustomerId UNIQUEIDENTIFIER NOT NULL,
+    TenantId UNIQUEIDENTIFIER NOT NULL,
+    ServicePackageId INT NOT NULL,
+    PurchaseDate DATETIME2 NOT NULL,
+    ExpiryDate DATETIME2 NOT NULL,
+    PaymentType NVARCHAR(20) NOT NULL, -- FullPayment, Installments, Deposit
+    TotalAmount DECIMAL(10,2) NOT NULL,
+    AmountPaid DECIMAL(10,2) NOT NULL,
+    AmountDue DECIMAL(10,2) NOT NULL,
+    Status NVARCHAR(20) NOT NULL, -- Active, Suspended, Expired, Cancelled, Completed
+    IsExpired BIT DEFAULT 0,
+    PurchaseInvoiceId INT NULL,
+    CreatedAt DATETIME2 DEFAULT GETUTCDATE(),
+    UpdatedAt DATETIME2 DEFAULT GETUTCDATE(),
+    FOREIGN KEY (CustomerId) REFERENCES Users(Id),
+    FOREIGN KEY (TenantId) REFERENCES Tenants(Id),
+    FOREIGN KEY (ServicePackageId) REFERENCES ServicePackages(Id),
+    FOREIGN KEY (PurchaseInvoiceId) REFERENCES Invoices(Id)
+);
+
+CREATE INDEX IX_CustomerPackages_CustomerId ON CustomerPackages(CustomerId);
+CREATE INDEX IX_CustomerPackages_Status ON CustomerPackages(Status);
+
+-- Customer Package Services (Session tracking)
+CREATE TABLE CustomerPackageServices (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    CustomerPackageId INT NOT NULL,
+    ServiceId UNIQUEIDENTIFIER NOT NULL,
+    TotalSessions INT NOT NULL,
+    UsedSessions INT DEFAULT 0,
+    RemainingSessions AS (TotalSessions - UsedSessions) PERSISTED,
+    FOREIGN KEY (CustomerPackageId) REFERENCES CustomerPackages(Id) ON DELETE CASCADE,
+    FOREIGN KEY (ServiceId) REFERENCES Services(Id)
+);
+
+-- Package Session Usage (Audit trail)
+CREATE TABLE PackageSessionUsages (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    CustomerPackageServiceId INT NOT NULL,
+    AppointmentId UNIQUEIDENTIFIER NOT NULL,
+    UsedAt DATETIME2 DEFAULT GETUTCDATE(),
+    StaffId UNIQUEIDENTIFIER NOT NULL,
+    Notes NVARCHAR(500) NULL,
+    FOREIGN KEY (CustomerPackageServiceId) REFERENCES CustomerPackageServices(Id),
+    FOREIGN KEY (AppointmentId) REFERENCES Appointments(Id),
+    FOREIGN KEY (StaffId) REFERENCES Staff(Id)
+);
+
+-- Installment Plans
+CREATE TABLE PackageInstallmentPlans (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    CustomerPackageId INT NOT NULL,
+    NumberOfInstallments INT NOT NULL,
+    InstallmentAmount DECIMAL(10,2) NOT NULL,
+    DayOfMonthForPayment INT NOT NULL,
+    Status NVARCHAR(20) NOT NULL, -- Active, Completed, Suspended, Cancelled
+    CreatedAt DATETIME2 DEFAULT GETUTCDATE(),
+    FOREIGN KEY (CustomerPackageId) REFERENCES CustomerPackages(Id)
+);
+
+-- Installments
+CREATE TABLE Installments (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    InstallmentPlanId INT NOT NULL,
+    InstallmentNumber INT NOT NULL,
+    Amount DECIMAL(10,2) NOT NULL,
+    DueDate DATETIME2 NOT NULL,
+    PaidDate DATETIME2 NULL,
+    Status NVARCHAR(20) NOT NULL, -- Pending, Paid, Overdue, Failed, Waived
+    PaymentTransactionId NVARCHAR(100) NULL,
+    FOREIGN KEY (InstallmentPlanId) REFERENCES PackageInstallmentPlans(Id)
+);
+
+CREATE INDEX IX_Installments_Status ON Installments(Status);
+CREATE INDEX IX_Installments_DueDate ON Installments(DueDate);
+```
+
+**Session Deduction Logic:**
+```csharp
+public class PackageSessionService : IPackageSessionService
+{
+    public async Task<bool> DeductSessionAsync(Guid appointmentId)
+    {
+        var appointment = await _context.Appointments
+            .Include(a => a.Services)
+            .Include(a => a.Customer)
+            .FirstOrDefaultAsync(a => a.Id == appointmentId);
+        
+        if (appointment == null || appointment.Status != AppointmentStatus.Completed)
+            return false;
+        
+        // Find active packages for customer
+        var activePackages = await _context.CustomerPackages
+            .Where(cp => cp.CustomerId == appointment.CustomerId 
+                      && cp.TenantId == appointment.TenantId
+                      && cp.Status == CustomerPackageStatus.Active
+                      && cp.ExpiryDate > DateTime.UtcNow)
+            .Include(cp => cp.Services)
+            .ToListAsync();
+        
+        foreach (var appointmentService in appointment.Services)
+        {
+            // Find package that covers this service
+            var packageService = activePackages
+                .SelectMany(p => p.Services)
+                .FirstOrDefault(ps => ps.ServiceId == appointmentService.ServiceId 
+                                   && ps.RemainingSessions > 0);
+            
+            if (packageService != null)
+            {
+                // Deduct session
+                packageService.UsedSessions++;
+                
+                // Log usage
+                var usage = new PackageSessionUsage
+                {
+                    CustomerPackageServiceId = packageService.Id,
+                    AppointmentId = appointmentId,
+                    StaffId = appointment.StaffId,
+                    UsedAt = DateTime.UtcNow,
+                    Notes = $"Session used for {appointmentService.Service.Name}"
+                };
+                
+                await _context.PackageSessionUsages.AddAsync(usage);
+                
+                // Send notification
+                await _notificationService.SendAsync(new Notification
+                {
+                    UserId = appointment.CustomerId,
+                    Type = NotificationType.SessionUsed,
+                    Title = "Package session used",
+                    Body = $"You have {packageService.RemainingSessions - 1} sessions remaining"
+                });
+                
+                // Check if package is completed
+                var allServices = await _context.CustomerPackageServices
+                    .Where(cps => cps.CustomerPackageId == packageService.CustomerPackageId)
+                    .ToListAsync();
+                
+                if (allServices.All(s => s.RemainingSessions == 0))
+                {
+                    var package = await _context.CustomerPackages
+                        .FindAsync(packageService.CustomerPackageId);
+                    package.Status = CustomerPackageStatus.Completed;
+                    
+                    await _notificationService.SendAsync(new Notification
+                    {
+                        UserId = appointment.CustomerId,
+                        Type = NotificationType.PackageCompleted,
+                        Title = "Package completed",
+                        Body = "All sessions in your package have been used"
+                    });
+                }
+            }
+        }
+        
+        await _context.SaveChangesAsync();
+        return true;
+    }
+}
+```
+
+**Package Expiry Background Job:**
+```csharp
+public class PackageExpiryJob : IHostedService, IDisposable
+{
+    private Timer _timer;
+    private readonly IServiceProvider _serviceProvider;
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        // Run daily at 2 AM
+        _timer = new Timer(CheckExpiredPackages, null, TimeSpan.Zero, TimeSpan.FromHours(24));
+        return Task.CompletedTask;
+    }
+
+    private async void CheckExpiredPackages(object state)
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
+        
+        var today = DateTime.UtcNow.Date;
+        
+        // Find expiring packages (30, 15, 7, 3, 1 days before)
+        var expiringPackages = await context.CustomerPackages
+            .Where(cp => cp.Status == CustomerPackageStatus.Active 
+                      && cp.ExpiryDate >= today 
+                      && cp.ExpiryDate <= today.AddDays(30))
+            .Include(cp => cp.Customer)
+            .Include(cp => cp.ServicePackage)
+            .ToListAsync();
+        
+        foreach (var package in expiringPackages)
+        {
+            var daysUntilExpiry = (package.ExpiryDate - today).Days;
+            
+            // Send notifications at specific intervals
+            if (new[] { 30, 15, 7, 3, 1 }.Contains(daysUntilExpiry))
+            {
+                await notificationService.SendAsync(new Notification
+                {
+                    UserId = package.CustomerId,
+                    Type = NotificationType.PackageExpiring,
+                    Title = "Package expiring soon",
+                    Body = $"Your '{package.ServicePackage.Name}' package expires in {daysUntilExpiry} days"
+                });
+            }
+        }
+        
+        // Mark expired packages
+        var expiredPackages = await context.CustomerPackages
+            .Where(cp => cp.Status == CustomerPackageStatus.Active 
+                      && cp.ExpiryDate < today)
+            .ToListAsync();
+        
+        foreach (var package in expiredPackages)
+        {
+            package.Status = CustomerPackageStatus.Expired;
+            package.IsExpired = true;
+            
+            await notificationService.SendAsync(new Notification
+            {
+                UserId = package.CustomerId,
+                Type = NotificationType.PackageExpired,
+                Title = "Package expired",
+                Body = $"Your '{package.ServicePackage.Name}' package has expired"
+            });
+        }
+        
+        await context.SaveChangesAsync();
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        _timer?.Change(Timeout.Infinite, 0);
+        return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}
+```
+
+### 10.4 Notification System Architecture
+
+#### 10.4.1 Multi-Channel Notification Flow
+
+```
+┌─────────────────────────────────────────────────┐
+│         NOTIFICATION TRIGGER                    │
+└─────────────────────────────────────────────────┘
+                    │
+                    ├──► Booking Created
+                    ├──► Appointment Reminder
+                    ├──► Payment Received
+                    ├──► Package Expiring
+                    └──► Custom Event
+                    │
+                    ▼
+┌─────────────────────────────────────────────────┐
+│      NOTIFICATION SERVICE                       │
+│  - Determine recipient                          │
+│  - Get user notification preferences            │
+│  - Load notification template                   │
+│  - Merge template with data                     │
+└─────────────┬───────────────────────────────────┘
+              │
+              ├──► Queue for SMS ──────► SMS Provider (Twilio)
+              │                          └──► Delivery Status
+              │
+              ├──► Queue for Email ─────► Email Provider (SendGrid)
+              │                          └──► Open/Click Tracking
+              │
+              ├──► Queue for Push ──────► Push Service (Firebase)
+              │                          └──► Delivery Receipt
+              │
+              └──► Store In-App ────────► Database
+                                         └──► Mark as unread
+```
+
+**Notification Service Implementation:**
+```csharp
+public class NotificationService : INotificationService
+{
+    public async Task SendBookingConfirmationAsync(Guid appointmentId)
+    {
+        var appointment = await _context.Appointments
+            .Include(a => a.Customer)
+            .Include(a => a.Staff)
+            .Include(a => a.Services)
+            .ThenInclude(s => s.Service)
+            .Include(a => a.Tenant)
+            .FirstOrDefaultAsync(a => a.Id == appointmentId);
+        
+        if (appointment == null) return;
+        
+        // Get user notification preferences
+        var preferences = await GetUserPreferencesAsync(appointment.CustomerId);
+        
+        // Prepare notification data
+        var data = new Dictionary<string, string>
+        {
+            ["CustomerName"] = appointment.Customer.FirstName,
+            ["SalonName"] = appointment.Tenant.Name,
+            ["DateTime"] = appointment.StartTime.ToString("dd MMMM yyyy HH:mm"),
+            ["Services"] = string.Join(", ", appointment.Services.Select(s => s.Service.Name)),
+            ["StaffName"] = $"{appointment.Staff.FirstName} {appointment.Staff.LastName}",
+            ["TotalPrice"] = appointment.TotalPrice.ToString("C"),
+            ["CancellationUrl"] = $"https://rendevumvar.com/appointments/{appointmentId}/cancel"
+        };
+        
+        // Send via enabled channels
+        if (preferences.EmailEnabled)
+        {
+            await QueueEmailNotificationAsync(
+                NotificationType.BookingConfirmation,
+                appointment.Customer.Email,
+                data);
+        }
+        
+        if (preferences.SMSEnabled)
+        {
+            await QueueSMSNotificationAsync(
+                NotificationType.BookingConfirmation,
+                appointment.Customer.PhoneNumber,
+                data);
+        }
+        
+        if (preferences.PushEnabled)
+        {
+            await QueuePushNotificationAsync(
+                NotificationType.BookingConfirmation,
+                appointment.CustomerId,
+                data);
+        }
+        
+        // Always create in-app notification
+        await CreateInAppNotificationAsync(
+            NotificationType.BookingConfirmation,
+            appointment.CustomerId,
+            data);
+    }
+    
+    private async Task QueueEmailNotificationAsync(
+        NotificationType type, 
+        string email, 
+        Dictionary<string, string> data)
+    {
+        var template = await GetTemplateAsync(type, NotificationChannel.Email);
+        var subject = MergeTemplate(template.Subject, data);
+        var body = MergeTemplate(template.Body, data);
+        
+        var notification = new NotificationQueue
+        {
+            Type = type,
+            Channel = NotificationChannel.Email,
+            RecipientContact = email,
+            Subject = subject,
+            Body = body,
+            Status = NotificationStatus.Queued,
+            ScheduledFor = DateTime.UtcNow,
+            AttemptCount = 0
+        };
+        
+        await _context.NotificationQueue.AddAsync(notification);
+        await _context.SaveChangesAsync();
+    }
+}
+```
+
+**Notification Background Worker:**
+```csharp
+public class NotificationWorker : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            await ProcessNotificationQueueAsync();
+            await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+        }
+    }
+    
+    private async Task ProcessNotificationQueueAsync()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        
+        // Get pending notifications
+        var notifications = await context.NotificationQueue
+            .Where(n => n.Status == NotificationStatus.Queued 
+                     && n.ScheduledFor <= DateTime.UtcNow
+                     && n.AttemptCount < 3)
+            .Take(50)
+            .ToListAsync();
+        
+        foreach (var notification in notifications)
+        {
+            try
+            {
+                notification.Status = NotificationStatus.Sending;
+                notification.AttemptCount++;
+                await context.SaveChangesAsync();
+                
+                switch (notification.Channel)
+                {
+                    case NotificationChannel.Email:
+                        await _emailService.SendAsync(
+                            notification.RecipientContact,
+                            notification.Subject,
+                            notification.Body);
+                        break;
+                    
+                    case NotificationChannel.SMS:
+                        await _smsService.SendAsync(
+                            notification.RecipientContact,
+                            notification.Body);
+                        break;
+                    
+                    case NotificationChannel.Push:
+                        await _pushService.SendAsync(
+                            notification.RecipientId,
+                            notification.Subject,
+                            notification.Body);
+                        break;
+                }
+                
+                notification.Status = NotificationStatus.Sent;
+                notification.SentAt = DateTime.UtcNow;
+            }
+            catch (Exception ex)
+            {
+                notification.Status = notification.AttemptCount >= 3 
+                    ? NotificationStatus.Failed 
+                    : NotificationStatus.Queued;
+                notification.FailureReason = ex.Message;
+            }
+            
+            await context.SaveChangesAsync();
+        }
+    }
+}
+```
+
+### 10.5 Payment Integration Architecture
+
+**Payment Flow Diagram:**
+```
+Customer initiates payment
+        │
+        ├──► PayTR Integration
+        │    ├──► Generate payment iframe
+        │    ├──► Customer enters card details
+        │    ├──► 3D Secure authentication
+        │    ├──► Payment processed
+        │    └──► Webhook callback
+        │
+        ├──► iyzico Integration
+        │    └──► Similar flow
+        │
+        └──► QR Code Payment
+             ├──► Generate QR with payment details
+             ├──► Customer scans with bank app
+             ├──► Payment confirmation
+             └──► Webhook callback
+
+Payment Gateway Webhook
+        │
+        ├──► Validate signature
+        ├──► Update Payment record
+        ├──► Update Appointment/Package
+        ├──► Send receipt email
+        └──► Trigger success notification
+```
+
+**Payment Service:**
+```csharp
+public class PaymentService : IPaymentService
+{
+    public async Task<PaymentInitiationResult> InitiatePaymentAsync(PaymentRequest request)
+    {
+        // Create payment record
+        var payment = new Payment
+        {
+            TenantId = request.TenantId,
+            CustomerId = request.CustomerId,
+            AppointmentId = request.AppointmentId,
+            CustomerPackageId = request.CustomerPackageId,
+            Amount = request.Amount,
+            Currency = "TRY",
+            Method = request.Method,
+            Status = PaymentStatus.Pending,
+            PaymentGateway = request.Gateway
+        };
+        
+        await _context.Payments.AddAsync(payment);
+        await _context.SaveChangesAsync();
+        
+        // Call payment gateway
+        switch (request.Gateway)
+        {
+            case "PayTR":
+                return await InitiatePayTRPaymentAsync(payment, request);
+            case "iyzico":
+                return await InitiateiyzPaymentAsync(payment, request);
+            default:
+                throw new NotSupportedException($"Gateway {request.Gateway} not supported");
+        }
+    }
+    
+    public async Task<bool> HandleWebhookAsync(string gateway, string payload, string signature)
+    {
+        // Validate webhook signature
+        if (!ValidateSignature(gateway, payload, signature))
+        {
+            _logger.LogWarning("Invalid webhook signature from {Gateway}", gateway);
+            return false;
+        }
+        
+        // Parse webhook data
+        var webhookData = ParseWebhookData(gateway, payload);
+        
+        // Find payment record
+        var payment = await _context.Payments
+            .FirstOrDefaultAsync(p => p.TransactionId == webhookData.TransactionId);
+        
+        if (payment == null)
+        {
+            _logger.LogWarning("Payment not found for transaction {TransactionId}", webhookData.TransactionId);
+            return false;
+        }
+        
+        // Update payment status
+        payment.Status = webhookData.Success ? PaymentStatus.Completed : PaymentStatus.Failed;
+        payment.CompletedAt = DateTime.UtcNow;
+        payment.FailureReason = webhookData.ErrorMessage;
+        
+        if (webhookData.Success)
+        {
+            // Update related entity (appointment or package)
+            if (payment.AppointmentId.HasValue)
+            {
+                var appointment = await _context.Appointments.FindAsync(payment.AppointmentId.Value);
+                appointment.PaymentStatus = PaymentStatus.Completed;
+            }
+            else if (payment.CustomerPackageId.HasValue)
+            {
+                var package = await _context.CustomerPackages.FindAsync(payment.CustomerPackageId.Value);
+                package.AmountPaid += payment.Amount;
+                package.AmountDue -= payment.Amount;
+            }
+            
+            // Send receipt
+            await _notificationService.SendPaymentReceiptAsync(payment.Id);
+        }
+        
+        await _context.SaveChangesAsync();
+        return true;
+    }
+}
+```
+
+---
+
+## 11. Appendices
 
 ### Appendix A: Technology Versions
 - .NET Core: 8.0

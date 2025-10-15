@@ -1,5 +1,6 @@
 @import './styles/appointment.css';
 @import './styles/services.css';
+@import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 #root {
   max-width: 1280px;

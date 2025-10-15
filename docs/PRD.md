@@ -547,7 +547,593 @@ RendevumVar is a comprehensive, multi-tenant SaaS platform designed to revolutio
 6. How to handle walk-in appointments?
 7. Should we support multiple languages beyond Turkish and English?
 
-## 14. Future Considerations
+## 14. Advanced Features - Phase 2 Requirements
+
+### 14.1 Subscription and Pricing Management
+**Priority:** P0 (Must Have)
+
+#### 14.1.1 Business Subscription Plans
+- **Free Plan (Trial)**
+  - 7-30 days free trial period
+  - Limited to 1 staff member
+  - Maximum 50 appointments per month
+  - Basic features only
+  - RendevumVar branding
+  
+- **Starter Plan**
+  - Up to 3 staff members
+  - Unlimited appointments
+  - Basic reporting
+  - Email support
+  - Remove branding option
+  
+- **Professional Plan**
+  - Up to 10 staff members
+  - Advanced analytics
+  - SMS notifications included
+  - Priority support
+  - Custom branding
+  - Package/session management
+  
+- **Enterprise Plan**
+  - Unlimited staff members
+  - Multi-location support
+  - API access
+  - Dedicated account manager
+  - White-label option
+  - Custom integrations
+
+#### 14.1.2 Payment Models
+- Monthly subscription
+- Annual subscription (2 months free)
+- Pay-per-appointment (commission-based alternative)
+- Custom enterprise pricing
+
+#### 14.1.3 Subscription Features
+- Self-service plan upgrade/downgrade
+- Automatic billing and invoicing
+- Payment method management
+- Trial period management
+- Subscription analytics
+- Dunning management (failed payment handling)
+
+### 14.2 Customer-Business Connection System
+**Priority:** P0 (Must Have)
+
+#### 14.2.1 Invitation Methods
+
+**A. QR Code Invitation**
+- Business generates unique QR code
+- Customers scan QR code in salon
+- Auto-fills business information
+- Customer completes registration
+- Mutual approval required
+- QR code can be displayed at reception, mirrors, business cards
+
+**B. Invitation Link**
+- Business generates shareable invitation link
+- Link can be shared via:
+  - WhatsApp
+  - SMS
+  - Email
+  - Social media
+  - Website
+- Link contains unique invitation token
+- Customer clicks link to register/connect
+- Auto-establishes connection upon registration
+
+**C. SMS Invitation**
+- Business enters customer phone number
+- System sends SMS with invitation link
+- Customer clicks link to join
+- Phone number validation
+- Opt-in required for marketing messages
+
+**D. Invitation Code**
+- 6-8 character alphanumeric code
+- Customer enters code during registration
+- Business can share code verbally or via text
+- Code expiration after 30 days
+- Usage limit per code (optional)
+
+#### 14.2.2 Mutual Approval System
+**Two-way connection process:**
+
+**Scenario 1: Customer Initiates**
+1. Customer scans QR/uses link/enters code
+2. Customer sends connection request to business
+3. Business receives notification
+4. Business reviews customer profile
+5. Business approves/rejects request
+6. Both parties notified of decision
+
+**Scenario 2: Business Initiates**
+1. Business sends invitation to customer
+2. Customer receives invitation notification
+3. Customer reviews business profile
+4. Customer accepts/declines invitation
+5. Both parties notified of decision
+
+**Scenario 3: Existing User Connection**
+- If customer already registered, just connection approval needed
+- If customer not registered, registration + connection in one flow
+
+#### 14.2.3 Connection Management
+- Customer can connect to multiple businesses
+- Business can have unlimited customers
+- Connection status tracking (pending, active, blocked, deleted)
+- Disconnect/block functionality for both parties
+- Re-invitation capability
+- Connection history and audit trail
+
+### 14.3 Multi-Staff Business Management
+**Priority:** P0 (Must Have)
+
+#### 14.3.1 Staff Roles and Permissions
+**Owner (Business Admin)**
+- Full system access
+- Add/remove staff
+- Configure business settings
+- View all reports
+- Manage subscriptions
+- Access financial data
+
+**Manager**
+- Manage staff schedules
+- Approve/reject bookings
+- View reports
+- Manage customers
+- Cannot modify billing
+
+**Staff Member (Stylist/Barber)**
+- View own schedule
+- Manage own appointments
+- View assigned customers
+- Update availability
+- Limited settings access
+
+**Receptionist**
+- Create/manage all appointments
+- View all schedules
+- Manage walk-ins
+- Process payments
+- Cannot access reports/settings
+
+#### 14.3.2 Staff Configuration
+
+**Working Hours Management**
+- Individual staff schedules
+- Different hours per day of week
+- Break time scheduling
+- Lunch break management
+- Multiple break periods per day
+
+**Availability Control**
+- Mark days off/vacation
+- Sick leave management
+- Emergency time blocking
+- Recurring unavailability (e.g., every Tuesday afternoon)
+- Time slot locking
+
+**Service Assignment**
+- Staff can provide specific services only
+- Service expertise levels (junior/senior/master)
+- Price variations by staff expertise
+- Staff specializations tagging
+
+#### 14.3.3 Calendar Visibility Settings
+**Owner Controls:**
+- Show/hide staff calendars to customers
+- Allow/prevent direct staff booking by customers
+- Require owner approval for bookings
+- Round-robin assignment option
+- Load balancing across staff
+
+**Customer Booking Options:**
+1. **Full Visibility Mode:** Customer sees all staff availability, selects preferred staff
+2. **Service-First Mode:** Customer selects service, system suggests available staff
+3. **Auto-Assignment Mode:** System assigns based on availability (no staff selection)
+4. **Mixed Mode:** Some staff visible, others hidden (owner configures per staff)
+
+### 14.4 Advanced Appointment Booking System
+**Priority:** P0 (Must Have)
+
+#### 14.4.1 Booking Methods
+
+**Method 1: Request-Based Booking**
+- Customer sends appointment request
+- Includes preferred date/time/service
+- Business receives notification
+- Business approves/rejects/proposes alternative
+- Customer notified of decision
+- Ideal for high-demand businesses
+
+**Method 2: Direct Booking**
+- Customer views real-time availability
+- Selects available time slot
+- Instant confirmation
+- Auto-added to staff calendar
+- Ideal for quick bookings
+
+**Method 3: Consultation Booking**
+- Customer describes needs without specific service
+- Business reviews and proposes services
+- Price and duration estimated
+- Customer approves proposal
+- Booking confirmed
+
+#### 14.4.2 Time Slot Reservation System
+**"Holding" Mechanism (like theater seat reservation)**
+- Customer selects time slot
+- Slot locked for 5-10 minutes
+- "This slot is being reserved by another customer" shown to others
+- Customer must complete booking within time limit
+- Auto-release if abandoned
+- Prevents double-booking conflicts
+
+#### 14.4.3 Booking Policies Configuration
+
+**Advance Booking Rules**
+- Minimum advance notice (e.g., "No bookings within 2 hours")
+- Maximum advance booking (e.g., "Can book up to 3 months ahead")
+- Same-day booking allowed/restricted
+- Peak hours may have different rules
+
+**Cancellation Policies**
+- Cancellation deadline (e.g., "Cancel at least 24 hours before")
+- Late cancellation fee
+- No-show penalty
+- Multiple cancellation limits
+- Blacklist after X no-shows
+
+**Rescheduling Policies**
+- Free rescheduling until X hours before
+- Limited number of reschedules
+- Reschedule must be within X days
+
+#### 14.4.4 Service Duration and Timing
+- Service base duration
+- Buffer time between appointments
+- Setup/cleanup time
+- Overlap prevention
+- Back-to-back booking settings
+
+### 14.5 Multi-Service and Group Bookings
+**Priority:** P1 (Should Have)
+
+#### 14.5.1 Multi-Service Booking
+- Customer selects multiple services in one booking
+- System calculates total duration
+- Checks staff availability for entire duration
+- Sequential service scheduling
+- Total price calculation
+- Package discounts applied automatically
+
+#### 14.5.2 Group Bookings
+- Book for multiple people simultaneously
+- Each person can have different services
+- Must have available staff for all people
+- Group discount options
+- Coordinator designation
+- Individual notifications to all participants
+
+### 14.6 Package and Session Management
+**Priority:** P1 (Should Have)
+
+#### 14.6.1 Package Definition
+**Package Types:**
+- **Multi-Session Package:** Same service X times (e.g., "10 sessions laser hair removal")
+- **Mixed Service Package:** Different services bundled (e.g., "Haircut + Beard Trim + Massage")
+- **Unlimited Packages:** Unlimited services within time period (e.g., "Unlimited haircuts for 3 months")
+- **Membership Packages:** Monthly recurring access to services
+
+**Package Configuration:**
+- Package name and description
+- Services included (with quantities)
+- Total price vs individual price comparison
+- Discount percentage
+- Validity period (e.g., 3 months, 6 months, 1 year)
+- Usage restrictions (max X per week/month)
+- Refund policy
+- Transfer policy (to another person)
+
+#### 14.6.2 Package Purchase Flow
+1. Customer views available packages
+2. Selects package
+3. Payment options:
+   - **Full Payment:** Pay entire amount upfront
+   - **Installments:** Split payment over X months
+   - **Deposit:** Pay partial amount, rest later
+4. Package activated after payment
+5. Customer receives package details
+6. Sessions tracked automatically
+
+#### 14.6.3 Session Tracking
+**Automatic Session Deduction:**
+- After each appointment, system deducts one session
+- Remaining sessions displayed prominently
+- Customer notified of remaining balance
+- Expiry date prominently displayed
+- Auto-reminder before expiry
+
+**Session History:**
+- Date and time of each session used
+- Staff member who provided service
+- Service details
+- Photos/notes (optional)
+- Customer can view complete history
+
+**Expiry Management:**
+- Warning notifications (30, 15, 7 days before expiry)
+- Option to extend validity (with fee)
+- Option to transfer unused sessions
+- Expired package status and history retained
+
+#### 14.6.4 Payment and Credit Management
+**Payment Tracking:**
+- Full payment vs installment status
+- Payment schedule for installments
+- Auto-charge for recurring installments
+- Payment reminders
+- Late payment penalties
+- Payment history
+
+**Credit/Debt Management:**
+- Customer balance tracking
+- Outstanding balance alerts
+- Payment due date enforcement
+- Overdue payment handling
+- Block bookings if overdue
+- Payment plan modification
+- Debt collection workflow
+
+### 14.7 Pricing Visibility Control
+**Priority:** P1 (Should Have)
+
+#### 14.7.1 Business Settings
+**Owner Can Configure:**
+- Show prices to customers (Yes/No toggle)
+- Show individual service prices
+- Show package prices
+- Show staff price variations
+- Price visibility per service
+- "Price on request" option
+
+#### 14.7.2 Customer Experience
+**When Prices Hidden:**
+- Services shown without prices
+- "Contact for pricing" message
+- Customer can still request booking
+- Price revealed after approval/consultation
+- Reduces price shopping
+
+**When Prices Shown:**
+- Full price transparency
+- Enables price comparison
+- Customer can calculate total before booking
+- Builds trust
+
+### 14.8 Payment Integration
+**Priority:** P1 (Should Have)
+
+#### 14.8.1 Payment Providers
+**Turkish Market Integration:**
+- PayTR integration
+- iyzico integration
+- Param integration
+- Credit/debit card processing
+- 3D Secure support
+
+**QR Payment:**
+- Generate QR code for payment
+- Customer scans with banking app
+- Real-time payment confirmation
+- Receipt generation
+
+**Alternative Payment Methods:**
+- Bank transfer (manual confirmation)
+- Cash (marked in system)
+- Credit on account
+- Gift card redemption
+
+#### 14.8.2 Payment Timing Options
+1. **Prepayment Required:** Pay during booking
+2. **Deposit Required:** Pay X% during booking, rest at salon
+3. **Pay at Salon:** No online payment, pay in person
+4. **Subscription-Based:** Monthly subscription covers services
+5. **Pay After Service:** Invoice sent after appointment
+
+#### 14.8.3 Refund and Cancellation
+- Automated refund processing
+- Partial refund for cancellations
+- Refund to original payment method
+- Store credit option
+- Refund timeline (3-5 business days)
+
+### 14.9 Notification and Communication System
+**Priority:** P0 (Must Have)
+
+#### 14.9.1 Notification Channels
+**SMS Notifications:**
+- Booking confirmation
+- Appointment reminders (24h, 2h before)
+- Cancellation confirmation
+- Rescheduling confirmation
+- Package expiry warnings
+- Payment reminders
+
+**Email Notifications:**
+- Detailed booking confirmation
+- Receipt and invoices
+- Monthly summary
+- Marketing campaigns
+- Newsletter
+
+**Push Notifications:**
+- Real-time booking status
+- Staff assignment changes
+- New messages from business
+- Promotional offers
+
+**In-App Notifications:**
+- Bell icon with notification count
+- Notification history
+- Mark as read functionality
+
+#### 14.9.2 Custom Notification Sounds
+**Business Side:**
+- "Scissors sound" for new appointment
+- "Cash register" for payment received
+- "Bell" for customer arrival
+- Custom sound upload option
+
+**Customer Side:**
+- Standard notification sounds
+- Customizable per notification type
+- Do not disturb scheduling
+
+#### 14.9.3 Calendar Integration
+**Google Calendar Sync:**
+- Two-way synchronization
+- Appointments auto-added to Google Calendar
+- Updates reflect in both systems
+- Color-coding by appointment type
+- Multiple calendar support
+
+**iCal Export:**
+- Export appointments as .ics file
+- Compatible with Apple Calendar, Outlook
+- Subscribe to calendar feed
+
+**Reminders:**
+- Google Calendar reminders
+- Apple Calendar alerts
+- Custom reminder timing
+
+### 14.10 Cancellation and Modification System
+**Priority:** P0 (Must Have)
+
+#### 14.10.1 Cancellation Rules
+**Customer Cancellation:**
+- Must cancel X hours before appointment
+- Cancellation reason required (minimum 25 characters)
+- Reason categories: Personal, Emergency, Schedule conflict, Other
+- Validation prevents short reasons
+- Cancellation history tracked
+- Too many cancellations = warning/block
+
+**Business Cancellation:**
+- Staff emergency/sickness
+- Business closure (holiday, emergency)
+- Overbooking resolution
+- Mandatory reason (minimum 25 characters)
+- SMS + Email + Push notification to customer
+- Offer alternative time slots
+- Apology message template
+- Compensation option (discount coupon)
+
+**Automatic Cancellation:**
+- No-show after 15 minutes
+- Customer didn't confirm attendance
+- Payment failed (for prepaid bookings)
+
+#### 14.10.2 Modification/Rescheduling
+**Customer Initiated:**
+- Can reschedule until X hours before
+- View alternative time slots
+- Same service and staff preserved
+- Price difference calculated if applicable
+- Limited reschedules per booking
+
+**Business Initiated:**
+- Proposes alternative times
+- Customer approves/rejects
+- Multiple options provided
+- Urgent modifications flagged
+
+#### 14.10.3 No-Show Management
+**Detection:**
+- Customer didn't arrive within grace period
+- Staff marks as no-show
+- System auto-detects after time window
+
+**Consequences:**
+- No-show fee charged (if policy exists)
+- No-show count incremented
+- After X no-shows:
+  - Require prepayment for future bookings
+  - Temporary booking suspension
+  - Account review/permanent block
+
+**Appeals:**
+- Customer can dispute no-show
+- Provide evidence/explanation
+- Business reviews and decides
+- Restore status if justified
+
+### 14.11 Business Configuration and Settings
+**Priority:** P1 (Should Have)
+
+#### 14.11.1 Working Hours Configuration
+**Regular Hours:**
+- Different hours per day of week
+- Closed days specification
+- Seasonal hours (summer/winter)
+- Holiday hours override
+
+**Break Management:**
+- Lunch break timing
+- Multiple breaks per day
+- Staff-specific break times
+- Break time booking prevention
+
+**Special Closures:**
+- Public holidays
+- Annual vacation
+- Emergency closures
+- Renovation periods
+- Custom closure dates
+
+#### 14.11.2 Booking Restrictions
+**Time-Based Rules:**
+- No same-day bookings
+- Minimum X hours notice
+- Maximum X months advance
+- Weekend booking rules
+- Peak hour restrictions
+
+**Slot Management:**
+- Block specific time slots
+- Reserve slots for walk-ins
+- VIP customer priority slots
+- Emergency appointment slots
+
+### 14.12 Mobile-First Design Requirements
+**Priority:** P0 (Must Have)
+
+#### 14.12.1 Progressive Web App (PWA)
+- Installable on mobile home screen
+- Works offline (cached data)
+- Fast loading times
+- Native app-like experience
+- Push notifications support
+
+#### 14.12.2 Mobile Optimization
+- Touch-friendly buttons (minimum 44x44px)
+- Swipe gestures for navigation
+- Bottom navigation for main actions
+- Thumb-reach zones optimized
+- Large, readable fonts
+- Minimized data usage
+
+#### 14.12.3 Mobile-Specific Features
+- Camera access for QR scanning
+- Location services for nearby salons
+- Biometric authentication (fingerprint/face ID)
+- Mobile payment wallets integration
+- Share via mobile apps (WhatsApp, etc.)
+
+## 15. Future Considerations
 
 - AI-powered appointment recommendations
 - Chatbot for customer support
@@ -557,3 +1143,9 @@ RendevumVar is a comprehensive, multi-tenant SaaS platform designed to revolutio
 - Marketplace for beauty products
 - Franchise management features
 - White-label solution for large chains
+- Voice assistant integration (Alexa, Google Assistant)
+- Augmented reality for hairstyle preview
+- Blockchain-based loyalty tokens
+- Machine learning for no-show prediction
+- Automated social media posting
+- Multi-currency support for international expansion

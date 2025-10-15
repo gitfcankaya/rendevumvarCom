@@ -834,21 +834,438 @@
 
 ---
 
+## Phase 2 Implementation - Advanced Features (16-20 Weeks)
+
+### Sprint 1: Subscription & Billing (Week 1-3)
+
+#### Subscription Management
+- [ ] **Database Schema**
+  - [ ] Create SubscriptionPlans table (Free, Starter, Professional, Enterprise)
+  - [ ] Create TenantSubscriptions table (status, billing cycle, trial dates)
+  - [ ] Create Invoices table (invoice generation, PDF export)
+  - [ ] Create InvoiceLineItems table
+  - [ ] Add indexes for performance
+  
+- [ ] **Backend Implementation**
+  - [ ] Create SubscriptionPlan entity and repository
+  - [ ] Create TenantSubscription entity and repository
+  - [ ] Create Invoice entity and repository
+  - [ ] Implement SubscriptionService
+    - [ ] GetAvailablePlans()
+    - [ ] CreateTrial()
+    - [ ] UpgradeSubscription()
+    - [ ] DowngradeSubscription()
+    - [ ] CancelSubscription()
+    - [ ] CalculateProration()
+  - [ ] Implement InvoiceService
+    - [ ] GenerateInvoice()
+    - [ ] GenerateInvoicePDF()
+    - [ ] SendInvoiceEmail()
+  - [ ] Create subscription API endpoints (11 endpoints)
+  - [ ] Implement subscription enforcement middleware
+  - [ ] Create background job for billing cycle processing
+  - [ ] Create background job for trial expiration checks
+  
+- [ ] **Frontend Implementation**
+  - [ ] Create pricing page with plan comparison
+  - [ ] Create subscription management dashboard
+  - [ ] Create billing history page
+  - [ ] Create invoice viewer
+  - [ ] Create upgrade/downgrade flow
+  - [ ] Create cancellation flow with feedback
+  - [ ] Add subscription status indicator in header
+  - [ ] Create trial expiration warning banner
+  
+- [ ] **Testing**
+  - [ ] Unit tests for subscription logic
+  - [ ] Integration tests for billing cycles
+  - [ ] Test proration calculations
+  - [ ] Test trial to paid conversion
+  - [ ] Test plan upgrades/downgrades
+
+### Sprint 2: Invitation & Connection System (Week 4-6)
+
+#### Customer-Business Connection
+- [ ] **Database Schema**
+  - [ ] Create InvitationCodes table (QR, Link, SMS, Code types)
+  - [ ] Create CustomerBusinessConnections table (bidirectional approval)
+  - [ ] Create ConnectionHistory table (audit trail)
+  - [ ] Add indexes on Token, CustomerId, TenantId
+  
+- [ ] **Backend Implementation**
+  - [ ] Install QR code generation library (QRCoder)
+  - [ ] Create InvitationService
+    - [ ] GenerateQRCode()
+    - [ ] GenerateShareableLink()
+    - [ ] SendSMSInvitation()
+    - [ ] GenerateInvitationCode()
+    - [ ] ValidateInvitation()
+  - [ ] Create ConnectionService
+    - [ ] RequestConnection()
+    - [ ] ApproveConnection()
+    - [ ] RejectConnection()
+    - [ ] DisconnectCustomer()
+    - [ ] BlockCustomer()
+  - [ ] Create invitation API endpoints (8 endpoints)
+  - [ ] Create connection API endpoints (6 endpoints)
+  - [ ] Implement SMS provider integration (Twilio)
+  - [ ] Configure Azure Blob Storage for QR code images
+  
+- [ ] **Frontend Implementation**
+  - [ ] Create invitation generation dashboard
+  - [ ] Create QR code display component
+  - [ ] Create shareable link generator
+  - [ ] Create SMS invitation sender
+  - [ ] Create invitation scanner (mobile camera)
+  - [ ] Create connection request page
+  - [ ] Create connection approval interface
+  - [ ] Create customer list with connection status
+  - [ ] Add "Scan QR" button to customer mobile app
+  - [ ] Create connection history viewer
+  
+- [ ] **Testing**
+  - [ ] Test QR code generation and scanning
+  - [ ] Test invitation expiry
+  - [ ] Test bidirectional approval flow
+  - [ ] Test SMS delivery
+  - [ ] Test max use limits
+
+### Sprint 3: Multi-Staff Management (Week 7-9)
+
+#### Staff Roles & Permissions
+- [ ] **Database Schema**
+  - [ ] Create StaffMembers table (enhanced)
+  - [ ] Create RolePermissions table
+  - [ ] Create StaffWorkingHours table (recurring schedules)
+  - [ ] Create StaffTimeOff table (vacation, sick leave)
+  - [ ] Create TenantBookingSettings table
+  - [ ] Add CommissionRate, Specialties JSON field
+  
+- [ ] **Backend Implementation**
+  - [ ] Create enhanced StaffMember entity
+  - [ ] Create RolePermissions entity
+  - [ ] Create StaffWorkingHours entity
+  - [ ] Create StaffTimeOff entity
+  - [ ] Implement StaffManagementService
+    - [ ] CreateStaffMember()
+    - [ ] UpdateStaffRole()
+    - [ ] SetWorkingHours()
+    - [ ] RequestTimeOff()
+    - [ ] ApproveTimeOff()
+    - [ ] CheckPermissions()
+  - [ ] Create permission matrix (Owner, Manager, Staff, Receptionist)
+  - [ ] Create staff API endpoints (12 endpoints)
+  - [ ] Implement permission middleware
+  - [ ] Add role-based UI rendering
+  
+- [ ] **Frontend Implementation**
+  - [ ] Create staff management dashboard
+  - [ ] Create add/edit staff form
+  - [ ] Create role assignment interface
+  - [ ] Create working hours scheduler
+  - [ ] Create time-off request form
+  - [ ] Create time-off approval interface
+  - [ ] Create staff calendar view
+  - [ ] Create permission settings page
+  - [ ] Add staff filter to booking forms
+  - [ ] Create staff performance dashboard
+  
+- [ ] **Testing**
+  - [ ] Test role permissions enforcement
+  - [ ] Test working hours calculations
+  - [ ] Test time-off conflicts
+  - [ ] Test staff assignment algorithms
+
+### Sprint 4: Advanced Booking System (Week 10-12)
+
+#### Request-Based & Slot Reservation
+- [ ] **Database Schema**
+  - [ ] Create AppointmentRequests table (pending approval)
+  - [ ] Create SlotReservations table (10-minute hold)
+  - [ ] Create BookingPolicies table (rules per business)
+  - [ ] Add PreferredDateTime, AlternativeTimes fields
+  
+- [ ] **Backend Implementation**
+  - [ ] Create AppointmentRequest entity
+  - [ ] Create SlotReservation entity
+  - [ ] Create BookingPolicy entity
+  - [ ] Implement AdvancedBookingService
+    - [ ] CreateAppointmentRequest()
+    - [ ] ApproveAppointmentRequest()
+    - [ ] RejectAppointmentRequest()
+    - [ ] ReserveSlot() (10-minute hold)
+    - [ ] ReleaseSlot()
+    - [ ] CheckAvailability()
+    - [ ] ValidateBookingPolicy()
+  - [ ] Create booking API endpoints (16 endpoints)
+  - [ ] Implement slot expiration background job
+  - [ ] Add availability calculation with policies
+  
+- [ ] **Frontend Implementation**
+  - [ ] Create request-based booking form
+  - [ ] Create appointment request dashboard
+  - [ ] Create slot reservation UI (countdown timer)
+  - [ ] Create booking policy settings
+  - [ ] Create availability calendar with real-time updates
+  - [ ] Add alternative time suggestions
+  - [ ] Create booking confirmation with hold timer
+  - [ ] Add "Request Booking" vs "Book Now" toggle
+  
+- [ ] **Testing**
+  - [ ] Test slot reservation expiry
+  - [ ] Test concurrent booking attempts
+  - [ ] Test booking policy validation
+  - [ ] Test request approval flow
+
+### Sprint 5: Package & Session Management (Week 13-15)
+
+#### Service Packages & Installments
+- [ ] **Database Schema**
+  - [ ] Create ServicePackages table (4 types)
+  - [ ] Create PackageServices table (contents)
+  - [ ] Create CustomerPackages table (purchased)
+  - [ ] Create CustomerPackageServices table (session tracking)
+  - [ ] Create PackageSessionUsages table (audit trail)
+  - [ ] Create PackageInstallmentPlans table
+  - [ ] Create Installments table
+  
+- [ ] **Backend Implementation**
+  - [ ] Create all package entities
+  - [ ] Implement PackageService
+    - [ ] CreatePackage()
+    - [ ] PurchasePackage()
+    - [ ] CreateInstallmentPlan()
+    - [ ] ProcessInstallmentPayment()
+    - [ ] DeductSession()
+    - [ ] CheckExpiry()
+  - [ ] Create package API endpoints (11 endpoints)
+  - [ ] Implement automatic session deduction on appointment completion
+  - [ ] Create expiry warning background job (30, 15, 7, 3, 1 days)
+  - [ ] Create installment reminder job
+  
+- [ ] **Frontend Implementation**
+  - [ ] Create package creation wizard
+  - [ ] Create package catalog page
+  - [ ] Create package purchase flow
+  - [ ] Create installment payment setup
+  - [ ] Create customer package dashboard
+  - [ ] Create session usage tracker
+  - [ ] Create expiry countdown widget
+  - [ ] Add package selection to booking flow
+  - [ ] Create installment payment history
+  
+- [ ] **Testing**
+  - [ ] Test session deduction logic
+  - [ ] Test package expiry
+  - [ ] Test installment calculations
+  - [ ] Test mixed service packages
+
+### Sprint 6: Payment Integration (Week 16-17)
+
+#### PayTR & iyzico Integration
+- [ ] **Database Schema**
+  - [ ] Enhance Payments table (gateway, transaction ID)
+  - [ ] Add 3D Secure support fields
+  - [ ] Add refund tracking
+  
+- [ ] **Backend Implementation**
+  - [ ] Install PayTR SDK
+  - [ ] Install iyzico SDK
+  - [ ] Implement PaymentGatewayService
+    - [ ] InitiatePayTRPayment()
+    - [ ] InitiateiyzPayment()
+    - [ ] HandleWebhook()
+    - [ ] ProcessRefund()
+    - [ ] GenerateQRCode()
+  - [ ] Create payment API endpoints (2 main + webhooks)
+  - [ ] Implement webhook signature validation
+  - [ ] Add 3D Secure flow handling
+  - [ ] Create payment reconciliation job
+  
+- [ ] **Frontend Implementation**
+  - [ ] Create payment method selection
+  - [ ] Integrate PayTR iframe
+  - [ ] Integrate iyzico checkout
+  - [ ] Create QR payment display
+  - [ ] Create payment status tracker
+  - [ ] Create refund request form
+  - [ ] Add saved card management
+  - [ ] Create payment receipt viewer
+  
+- [ ] **Testing**
+  - [ ] Test PayTR integration (sandbox)
+  - [ ] Test iyzico integration (sandbox)
+  - [ ] Test webhook handling
+  - [ ] Test refund processing
+  - [ ] Test 3D Secure flow
+
+### Sprint 7: Notification System (Week 18-19)
+
+#### Multi-Channel Notifications
+- [ ] **Database Schema**
+  - [ ] Create NotificationTemplates table
+  - [ ] Create NotificationQueue table
+  - [ ] Create UserNotificationPreferences table
+  - [ ] Create NotificationHistory table
+  
+- [ ] **Backend Implementation**
+  - [ ] Integrate SendGrid (email)
+  - [ ] Integrate Twilio (SMS)
+  - [ ] Integrate Firebase Cloud Messaging (push)
+  - [ ] Configure Google Calendar API
+  - [ ] Implement NotificationService
+    - [ ] QueueNotification()
+    - [ ] SendEmail()
+    - [ ] SendSMS()
+    - [ ] SendPush()
+    - [ ] SyncGoogleCalendar()
+  - [ ] Create notification templates (10+ types)
+  - [ ] Create notification worker (background service)
+  - [ ] Implement retry logic (max 3 attempts)
+  - [ ] Add delivery status tracking
+  
+- [ ] **Frontend Implementation**
+  - [ ] Create notification preferences page
+  - [ ] Create in-app notification center
+  - [ ] Add notification badge to header
+  - [ ] Create push notification subscription
+  - [ ] Create Google Calendar connection flow
+  - [ ] Add custom sound settings (scissors snip)
+  - [ ] Create notification history page
+  
+- [ ] **Testing**
+  - [ ] Test email delivery
+  - [ ] Test SMS delivery
+  - [ ] Test push notifications
+  - [ ] Test Google Calendar sync
+  - [ ] Test notification retry logic
+
+### Sprint 8: Cancellation & No-Show System (Week 20)
+
+#### Cancellation Policies & Penalties
+- [ ] **Database Schema**
+  - [ ] Create AppointmentCancellations table
+  - [ ] Create CustomerNoShowHistory table
+  - [ ] Add cancellation policy fields to TenantSettings
+  
+- [ ] **Backend Implementation**
+  - [ ] Create AppointmentCancellation entity
+  - [ ] Create CustomerNoShowHistory entity
+  - [ ] Implement CancellationService
+    - [ ] CancelAppointment() (25-char reason validation)
+    - [ ] RecordNoShow()
+    - [ ] CheckNoShowLimit()
+    - [ ] CalculateLateFee()
+    - [ ] BlockCustomer()
+  - [ ] Create cancellation API endpoints (5 endpoints)
+  - [ ] Implement no-show tracking (3 strikes)
+  - [ ] Add late cancellation fee calculation
+  
+- [ ] **Frontend Implementation**
+  - [ ] Create cancellation form (25-char minimum)
+  - [ ] Create cancellation reason dropdown
+  - [ ] Create no-show tracker dashboard
+  - [ ] Create dispute submission form
+  - [ ] Add cancellation fee display
+  - [ ] Create customer block warning
+  - [ ] Add cancellation policy display
+  
+- [ ] **Testing**
+  - [ ] Test cancellation reason validation
+  - [ ] Test no-show counting
+  - [ ] Test customer blocking
+  - [ ] Test late fee calculation
+
+### Sprint 9: Mobile PWA Enhancements (Week 21-22)
+
+#### Progressive Web App Features
+- [ ] **Configuration**
+  - [ ] Create manifest.json (installable app)
+  - [ ] Configure service worker (offline mode)
+  - [ ] Add app icons (multiple sizes)
+  - [ ] Configure splash screens
+  
+- [ ] **Implementation**
+  - [ ] Implement offline data caching
+  - [ ] Add biometric authentication
+  - [ ] Optimize for touch (44x44px buttons)
+  - [ ] Add swipe gestures
+  - [ ] Implement pull-to-refresh
+  - [ ] Add haptic feedback
+  - [ ] Configure push notification permissions
+  - [ ] Add home screen install prompt
+  
+- [ ] **Testing**
+  - [ ] Test on iOS Safari
+  - [ ] Test on Android Chrome
+  - [ ] Test offline functionality
+  - [ ] Test biometric auth
+  - [ ] Run Lighthouse audit (PWA score)
+
+---
+
+## Phase 2 Testing & Deployment (Week 23-24)
+
+### Integration Testing
+- [ ] Test subscription flow end-to-end
+- [ ] Test invitation and connection flow
+- [ ] Test multi-staff booking scenarios
+- [ ] Test package purchase and usage
+- [ ] Test payment flows (all gateways)
+- [ ] Test notification delivery
+- [ ] Test cancellation policies
+
+### Performance Testing
+- [ ] Load test with 1000+ concurrent users
+- [ ] Test database query performance
+- [ ] Optimize slow queries
+- [ ] Test background job performance
+- [ ] Test notification queue processing
+
+### Security Testing
+- [ ] Penetration testing
+- [ ] SQL injection testing
+- [ ] XSS vulnerability scanning
+- [ ] CSRF protection verification
+- [ ] Rate limiting verification
+- [ ] Authentication flow security audit
+
+### Documentation
+- [ ] Update API documentation
+- [ ] Create admin user guide
+- [ ] Create business owner guide
+- [ ] Create customer user guide
+- [ ] Document deployment procedures
+
+### Deployment
+- [ ] Deploy Phase 2 to staging
+- [ ] Run full test suite
+- [ ] Performance profiling
+- [ ] Deploy to production
+- [ ] Run smoke tests
+- [ ] Monitor error logs
+
+---
+
 ## Notes
 
 ### Development Priorities
-1. **Must Have (MVP):** Authentication, Salon Management, Service Management, Staff Management, Booking System, Basic Notifications
-2. **Should Have:** Reviews, Reports, Payment Integration
-3. **Nice to Have:** Advanced analytics, Marketing tools, Mobile app
+1. **Phase 1 (MVP):** Authentication, Salon Management, Service Management, Staff Management, Basic Booking, Basic Notifications
+2. **Phase 2 (Advanced):** Subscriptions, Invitations, Multi-Staff, Advanced Booking, Packages, Payments, Full Notifications, PWA
+3. **Phase 3 (Future):** Native mobile apps, AI recommendations, Marketing automation
 
 ### Time Estimates
-- **MVP (Phase 1-8):** 8-10 weeks
-- **Full Featured (Phase 1-17):** 14-16 weeks
-- **Production Ready (Phase 1-19):** 15-17 weeks
+- **MVP (Phase 1):** 8-10 weeks
+- **Phase 2 (Advanced Features):** 22-24 weeks
+- **Total to Production Ready:** 30-34 weeks (7-8 months)
 
 ### Team Recommendations
-- **Minimum:** 2 full-stack developers
-- **Ideal:** 1 backend developer, 1 frontend developer, 1 DevOps engineer, 1 QA engineer
+- **Phase 2 Team:** 
+  - 2 Backend developers (.NET Core)
+  - 2 Frontend developers (React + TypeScript)
+  - 1 DevOps engineer
+  - 1 QA engineer
+  - 1 UI/UX designer (part-time)
 
 ### Risk Mitigation
 - Start with MVP features
@@ -857,7 +1274,17 @@
 - Regular security audits
 - User feedback loops
 - Scalability from day one
+- Payment gateway sandbox testing before production
+
+### Critical Dependencies
+- PayTR/iyzico merchant accounts
+- Twilio account for SMS
+- SendGrid account for email
+- Google Cloud Platform (Calendar API, Firebase)
+- Azure Blob Storage
+- SSL certificates for payment security
 
 ---
 
-**Last Updated:** 2024
+**Last Updated:** January 2024 - Phase 2 Planning Complete
+

@@ -25,6 +25,16 @@ public class ApplicationDbContext : DbContext
     public DbSet<ContentPage> ContentPages { get; set; }
     public DbSet<SubscriptionPlan> SubscriptionPlans { get; set; }
     public DbSet<Subscription> Subscriptions { get; set; }
+    
+    // Phase 2: Advanced Features
+    public DbSet<TenantSubscription> TenantSubscriptions { get; set; }
+    public DbSet<Invoice> Invoices { get; set; }
+    public DbSet<InvoiceLineItem> InvoiceLineItems { get; set; }
+    
+    // Phase 2: Staff Management
+    public DbSet<Role> Roles { get; set; }
+    public DbSet<StaffSchedule> StaffSchedules { get; set; }
+    public DbSet<TimeOffRequest> TimeOffRequests { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -162,11 +172,22 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Staff>(entity =>
         {
             entity.HasKey(e => e.Id);
+            entity.Property(e => e.FirstName).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.LastName).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Email).IsRequired().HasMaxLength(256);
+            entity.Property(e => e.Phone).HasMaxLength(20);
             entity.Property(e => e.Bio).HasMaxLength(1000);
             entity.Property(e => e.AverageRating).HasPrecision(3, 2);
+            entity.Property(e => e.InvitationToken).HasMaxLength(500);
+            entity.Property(e => e.HourlyRate).HasPrecision(18, 2);
+            entity.Property(e => e.CommissionRate).HasPrecision(5, 2);
+            
             entity.HasIndex(e => e.TenantId);
             entity.HasIndex(e => e.SalonId);
             entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.Email);
+            entity.HasIndex(e => e.InvitationToken);
+            entity.HasIndex(e => e.Status);
 
             entity.HasOne(e => e.Tenant)
                 .WithMany()
@@ -182,6 +203,11 @@ public class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+            
+            entity.HasOne(e => e.Role)
+                .WithMany(r => r.StaffMembers)
+                .HasForeignKey(e => e.RoleId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Appointment Configuration
@@ -372,5 +398,125 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => e.Method);
             entity.HasIndex(e => e.TransactionId);
         });
+
+        // Phase 2: TenantSubscription Configuration
+        modelBuilder.Entity<TenantSubscription>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.PaymentMethodId).HasMaxLength(100);
+            entity.Property(e => e.CancellationReason).HasMaxLength(500);
+            
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
+            entity.HasOne(e => e.SubscriptionPlan)
+                .WithMany(sp => sp.TenantSubscriptions)
+                .HasForeignKey(e => e.SubscriptionPlanId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
+            entity.HasIndex(e => e.TenantId);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.NextBillingDate);
+        });
+
+        // Phase 2: Invoice Configuration
+        modelBuilder.Entity<Invoice>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.InvoiceNumber).IsRequired().HasMaxLength(20);
+            entity.HasIndex(e => e.InvoiceNumber).IsUnique();
+            entity.Property(e => e.SubTotal).HasPrecision(18, 2);
+            entity.Property(e => e.TaxAmount).HasPrecision(18, 2);
+            entity.Property(e => e.TotalAmount).HasPrecision(18, 2);
+            entity.Property(e => e.Currency).HasMaxLength(3).HasDefaultValue("TRY");
+            entity.Property(e => e.PaymentTransactionId).HasMaxLength(100);
+            entity.Property(e => e.PdfUrl).HasMaxLength(500);
+            
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
+            entity.HasOne(e => e.TenantSubscription)
+                .WithMany(ts => ts.Invoices)
+                .HasForeignKey(e => e.TenantSubscriptionId)
+                .OnDelete(DeleteBehavior.SetNull);
+            
+            entity.HasIndex(e => e.TenantId);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.InvoiceDate);
+            entity.HasIndex(e => e.DueDate);
+        });
+
+        // Phase 2: InvoiceLineItem Configuration
+        modelBuilder.Entity<InvoiceLineItem>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Description).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.UnitPrice).HasPrecision(18, 2);
+            entity.Property(e => e.LineTotal).HasPrecision(18, 2);
+            
+            entity.HasOne(e => e.Invoice)
+                .WithMany(i => i.LineItems)
+                .HasForeignKey(e => e.InvoiceId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasIndex(e => e.InvoiceId);
+        });
+
+        // Phase 2: Role Configuration
+        modelBuilder.Entity<Role>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.Permissions).IsRequired().HasColumnType("nvarchar(max)");
+            
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
+            entity.HasIndex(e => new { e.TenantId, e.Name }).IsUnique();
+        });
+
+        // Phase 2: StaffSchedule Configuration
+        modelBuilder.Entity<StaffSchedule>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            
+            entity.HasOne(e => e.Staff)
+                .WithMany(s => s.Schedules)
+                .HasForeignKey(e => e.StaffId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasIndex(e => e.StaffId);
+            entity.HasIndex(e => new { e.StaffId, e.DayOfWeek });
+        });
+
+        // Phase 2: TimeOffRequest Configuration
+        modelBuilder.Entity<TimeOffRequest>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Reason).HasMaxLength(1000);
+            entity.Property(e => e.RejectionReason).HasMaxLength(500);
+            
+            entity.HasOne(e => e.Staff)
+                .WithMany(s => s.TimeOffRequests)
+                .HasForeignKey(e => e.StaffId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
+            entity.HasIndex(e => e.StaffId);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => new { e.StartDate, e.EndDate });
+        });
     }
 }
+

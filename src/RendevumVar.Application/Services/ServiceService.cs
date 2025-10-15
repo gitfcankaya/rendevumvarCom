@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RendevumVar.Application.DTOs;
 using RendevumVar.Application.Interfaces;
 using RendevumVar.Core.Entities;
+using RendevumVar.Core.Repositories;
 using RendevumVar.Infrastructure.Data;
 
 namespace RendevumVar.Application.Services;
@@ -9,10 +10,12 @@ namespace RendevumVar.Application.Services;
 public class ServiceService : IServiceService
 {
     private readonly ApplicationDbContext _context;
+    private readonly IServiceRepository _serviceRepository;
 
-    public ServiceService(ApplicationDbContext context)
+    public ServiceService(ApplicationDbContext context, IServiceRepository serviceRepository)
     {
         _context = context;
+        _serviceRepository = serviceRepository;
     }
 
     public async Task<IEnumerable<ServiceListDto>> GetAllServicesAsync(Guid tenantId)
@@ -129,7 +132,7 @@ public class ServiceService : IServiceService
         service.DurationMinutes = dto.DurationMinutes;
         service.ImageUrl = dto.ImageUrl;
         service.IsActive = dto.IsActive;
-        
+
         service.SetUpdated(userId);
 
         await _context.SaveChangesAsync();
@@ -180,9 +183,9 @@ public class ServiceService : IServiceService
     {
         return await _context.Services
             .Include(s => s.Category)
-            .Where(s => s.TenantId == tenantId && 
-                       s.Category!.Name == category && 
-                       s.IsActive && 
+            .Where(s => s.TenantId == tenantId &&
+                       s.Category!.Name == category &&
+                       s.IsActive &&
                        !s.IsDeleted)
             .OrderBy(s => s.Name)
             .Select(s => new ServiceListDto
@@ -205,5 +208,100 @@ public class ServiceService : IServiceService
             .OrderBy(sc => sc.Name)
             .Select(sc => sc.Name)
             .ToListAsync();
+    }
+
+    // Phase 3: Salon-specific service methods
+    public async Task<IEnumerable<ServiceDto>> GetServicesBySalonIdAsync(Guid salonId, Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var services = await _serviceRepository.GetBySalonIdAsync(salonId, true, cancellationToken);
+
+        return services.Where(s => s.TenantId == tenantId).Select(s => new ServiceDto
+        {
+            Id = s.Id,
+            Name = s.Name,
+            Description = s.Description,
+            DurationMinutes = s.DurationMinutes,
+            Price = s.Price,
+            ImageUrl = s.ImageUrl,
+            CategoryId = s.CategoryId,
+            CategoryName = s.Category?.Name,
+            IsActive = s.IsActive,
+            CreatedAt = s.CreatedAt,
+            CreatedBy = s.CreatedBy,
+            UpdatedAt = s.UpdatedAt,
+            UpdatedBy = s.UpdatedBy
+        });
+    }
+
+    public async Task<ServiceDto?> GetServiceWithStaffAsync(Guid id, Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var service = await _serviceRepository.GetServiceWithStaffAsync(id, cancellationToken);
+
+        if (service == null || service.TenantId != tenantId)
+            return null;
+
+        return new ServiceDto
+        {
+            Id = service.Id,
+            Name = service.Name,
+            Description = service.Description,
+            DurationMinutes = service.DurationMinutes,
+            Price = service.Price,
+            ImageUrl = service.ImageUrl,
+            CategoryId = service.CategoryId,
+            CategoryName = service.Category?.Name,
+            IsActive = service.IsActive,
+            CreatedAt = service.CreatedAt,
+            CreatedBy = service.CreatedBy,
+            UpdatedAt = service.UpdatedAt,
+            UpdatedBy = service.UpdatedBy,
+            StaffIds = service.Staff?.Select(st => st.Id).ToList() ?? new List<Guid>()
+        };
+    }
+
+    public async Task AssignStaffToServiceAsync(Guid serviceId, Guid staffId, Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var service = await _serviceRepository.GetByIdAsync(serviceId, cancellationToken);
+
+        if (service == null || service.TenantId != tenantId)
+            throw new InvalidOperationException($"Service with ID {serviceId} not found or access denied.");
+
+        await _serviceRepository.AssignStaffToServiceAsync(serviceId, staffId, cancellationToken);
+    }
+
+    public async Task RemoveStaffFromServiceAsync(Guid serviceId, Guid staffId, Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var service = await _serviceRepository.GetByIdAsync(serviceId, cancellationToken);
+
+        if (service == null || service.TenantId != tenantId)
+            throw new InvalidOperationException($"Service with ID {serviceId} not found or access denied.");
+
+        await _serviceRepository.RemoveStaffFromServiceAsync(serviceId, staffId, cancellationToken);
+    }
+
+    public async Task<List<StaffDto>> GetServiceStaffAsync(Guid serviceId, Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var service = await _serviceRepository.GetByIdAsync(serviceId, cancellationToken);
+
+        if (service == null || service.TenantId != tenantId)
+            return new List<StaffDto>();
+
+        var staff = await _serviceRepository.GetServiceStaffAsync(serviceId, cancellationToken);
+
+        return staff.Select(st => new StaffDto
+        {
+            Id = st.Id,
+            FirstName = st.FirstName,
+            LastName = st.LastName,
+            FullName = $"{st.FirstName} {st.LastName}",
+            Email = st.Email,
+            Phone = st.Phone,
+            Bio = st.Bio,
+            AverageRating = st.AverageRating,
+            ProfilePictureUrl = st.PhotoUrl,
+            RoleId = st.RoleId,
+            RoleName = st.Role?.Name,
+            Status = st.Status
+        }).ToList();
     }
 }

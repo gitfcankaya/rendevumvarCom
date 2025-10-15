@@ -7,6 +7,9 @@ using RendevumVar.Infrastructure.Data.Seeders;
 using RendevumVar.Application.Interfaces;
 using RendevumVar.Application.Services;
 using RendevumVar.API.Middleware;
+using RendevumVar.API.Authorization;
+using RendevumVar.Core.Constants;
+using RendevumVar.Core.Configuration;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,15 +24,66 @@ builder.Host.UseSerilog();
 // Add services to the container
 builder.Services.AddControllers();
 
+// Configure options
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+
 // Configure Entity Framework Core with SQL Server
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Register repositories
+builder.Services.AddScoped(typeof(RendevumVar.Core.Repositories.IRepository<>), typeof(RendevumVar.Infrastructure.Repositories.Repository<>));
+builder.Services.AddScoped<RendevumVar.Core.Repositories.ISubscriptionPlanRepository, RendevumVar.Infrastructure.Repositories.SubscriptionPlanRepository>();
+builder.Services.AddScoped<RendevumVar.Core.Repositories.ITenantSubscriptionRepository, RendevumVar.Infrastructure.Repositories.TenantSubscriptionRepository>();
+builder.Services.AddScoped<RendevumVar.Core.Repositories.IInvoiceRepository, RendevumVar.Infrastructure.Repositories.InvoiceRepository>();
+
+// Phase 2: Staff Management Repositories
+builder.Services.AddScoped<RendevumVar.Core.Repositories.IStaffRepository, RendevumVar.Infrastructure.Repositories.StaffRepository>();
+builder.Services.AddScoped<RendevumVar.Core.Repositories.IRoleRepository, RendevumVar.Infrastructure.Repositories.RoleRepository>();
+builder.Services.AddScoped<RendevumVar.Core.Repositories.IStaffScheduleRepository, RendevumVar.Infrastructure.Repositories.StaffScheduleRepository>();
+builder.Services.AddScoped<RendevumVar.Core.Repositories.ITimeOffRequestRepository, RendevumVar.Infrastructure.Repositories.TimeOffRequestRepository>();
+
+// Phase 3: Salon & Service Management Repositories
+builder.Services.AddScoped<RendevumVar.Core.Repositories.ISalonRepository, RendevumVar.Infrastructure.Repositories.SalonRepository>();
+builder.Services.AddScoped<RendevumVar.Core.Repositories.IServiceRepository, RendevumVar.Infrastructure.Repositories.ServiceRepository>();
+builder.Services.AddScoped<RendevumVar.Core.Repositories.IServiceCategoryRepository, RendevumVar.Infrastructure.Repositories.ServiceCategoryRepository>();
+
+// Phase 4: Appointment Management Repositories
+builder.Services.AddScoped<RendevumVar.Core.Repositories.IAppointmentRepository, RendevumVar.Infrastructure.Repositories.AppointmentRepository>();
 
 // Register application services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IServiceService, ServiceService>();
 builder.Services.AddScoped<IServiceCategoryService, ServiceCategoryService>();
+builder.Services.AddScoped<RendevumVar.Application.Services.ISubscriptionService, RendevumVar.Application.Services.SubscriptionService>();
+
+// Phase 2: Staff Management Services
+builder.Services.AddScoped<RendevumVar.Application.Services.IEmailService, RendevumVar.Application.Services.EmailService>();
+builder.Services.AddScoped<RendevumVar.Application.Services.IStaffService, RendevumVar.Application.Services.StaffService>();
+builder.Services.AddScoped<RendevumVar.Application.Services.IScheduleService, RendevumVar.Application.Services.ScheduleService>();
+builder.Services.AddScoped<RendevumVar.Application.Services.ITimeOffService, RendevumVar.Application.Services.TimeOffService>();
+
+// Phase 3: Salon & Service Management Services
+builder.Services.AddScoped<RendevumVar.Application.Interfaces.ISalonService, RendevumVar.Application.Services.SalonService>();
+builder.Services.AddScoped<RendevumVar.Application.Interfaces.IImageService, RendevumVar.Application.Services.ImageService>();
+
+// Phase 4: Appointment Management Services
+builder.Services.AddScoped<RendevumVar.Application.Interfaces.IAppointmentService, RendevumVar.Application.Services.AppointmentService>();
+builder.Services.AddScoped<RendevumVar.Application.Interfaces.IAvailabilityService, RendevumVar.Application.Services.AvailabilityService>();
+builder.Services.AddScoped<RendevumVar.Application.Interfaces.INotificationService, RendevumVar.Application.Services.NotificationService>();
+
+// Background Jobs
+builder.Services.AddHostedService<RendevumVar.API.BackgroundJobs.AppointmentReminderJob>();
+
+
+// Register background jobs
+builder.Services.AddHostedService<RendevumVar.API.BackgroundJobs.TrialExpirationJob>();
+builder.Services.AddHostedService<RendevumVar.API.BackgroundJobs.BillingCycleJob>();
+builder.Services.AddHostedService<RendevumVar.API.BackgroundJobs.OverdueInvoiceJob>();
+
+// Configure SignalR for real-time updates
+builder.Services.AddSignalR();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -55,18 +109,32 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddAuthorization();
+// Configure Authorization with Permission-based policies
+builder.Services.AddAuthorization(options =>
+{
+    // Add permission-based policies dynamically
+    foreach (var permission in RendevumVar.Core.Constants.Permissions.GetAllPermissions())
+    {
+        options.AddPolicy(permission, policy =>
+            policy.Requirements.Add(new RendevumVar.API.Authorization.PermissionRequirement(permission)));
+    }
+});
+
+// Register authorization handler
+builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, RendevumVar.API.Authorization.PermissionAuthorizationHandler>();
+
 
 // Configure Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new() { 
-        Title = "RendevumVar API", 
+    c.SwaggerDoc("v1", new()
+    {
+        Title = "RendevumVar API",
         Version = "v1",
         Description = "SaaS Salon Appointment System API"
     });
-    
+
     // Add JWT Authentication to Swagger
     c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
@@ -76,7 +144,7 @@ builder.Services.AddSwaggerGen(c =>
         Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
         Scheme = "Bearer"
     });
-    
+
     c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
     {
         {
@@ -101,7 +169,8 @@ builder.Services.AddCors(options =>
         {
             policy.WithOrigins("http://localhost:5173", "http://localhost:5174", "http://localhost:3000")
                   .AllowAnyHeader()
-                  .AllowAnyMethod();
+                  .AllowAnyMethod()
+                  .AllowCredentials(); // Required for SignalR
         });
 });
 
@@ -111,7 +180,7 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(c => 
+    app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "RendevumVar API v1");
     });
@@ -138,7 +207,13 @@ using (var scope = app.Services.CreateScope())
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Use subscription enforcement middleware after authentication
+app.UseSubscriptionEnforcement();
+
 app.MapControllers();
+
+// Map SignalR Hub
+app.MapHub<RendevumVar.API.Hubs.AppointmentHub>("/hubs/appointments");
 
 // Simple test endpoint
 app.MapGet("/", () => "RendevumVar API is running!");
