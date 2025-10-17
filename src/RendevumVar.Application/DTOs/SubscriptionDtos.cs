@@ -81,7 +81,7 @@ public class PaymentDto
     public DateTime CreatedAt { get; set; }
 }
 
-public class CreatePaymentDto
+public class CreateSubscriptionPaymentDto
 {
     public Guid? UserId { get; set; }
     public Guid? SubscriptionId { get; set; }

@@ -7,6 +7,8 @@ import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import AppointmentPage from './pages/AppointmentPage';
 import BookAppointmentPage from './pages/BookAppointmentPage';
@@ -21,6 +23,12 @@ import SalonProfilePage from './pages/SalonProfilePage';
 import SalonDashboard from './pages/SalonDashboard';
 import ManageSalonPage from './pages/ManageSalonPage';
 import ServiceManagementPage from './pages/ServiceManagementPage';
+import MyReviewsPage from './pages/MyReviewsPage';
+import SalonReviewManagementPage from './pages/SalonReviewManagementPage';
+import PaymentHistoryPage from './pages/PaymentHistoryPage';
+import AnalyticsDashboardPage from './pages/AnalyticsDashboardPage';
+import AdminUsersPage from './pages/AdminUsersPage';
+import SalonApprovalsPage from './pages/SalonApprovalsPage';
 import './App.css';
 
 const theme = createTheme({
@@ -45,6 +53,8 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/pricing" element={<PricingPage />} />
             
             {/* Public salon routes */}
@@ -63,11 +73,19 @@ function App() {
             <Route path="/services" element={<Layout><ServicesPage /></Layout>} />
             <Route path="/subscription" element={<Layout><SubscriptionDashboard /></Layout>} />
             <Route path="/sayfa/:slug" element={<Layout><DynamicContentPage /></Layout>} />
+            <Route path="/my-reviews" element={<Layout><MyReviewsPage /></Layout>} />
+            <Route path="/payment-history" element={<Layout><PaymentHistoryPage /></Layout>} />
+            <Route path="/analytics" element={<Layout><AnalyticsDashboardPage /></Layout>} />
             
             {/* Salon management routes - protected */}
             <Route path="/salon-dashboard" element={<Layout><SalonDashboard /></Layout>} />
             <Route path="/salons/:id/manage" element={<Layout><ManageSalonPage /></Layout>} />
             <Route path="/salons/:salonId/services" element={<Layout><ServiceManagementPage /></Layout>} />
+            <Route path="/salon-reviews" element={<Layout><SalonReviewManagementPage /></Layout>} />
+            
+            {/* Admin routes - protected */}
+            <Route path="/admin/users" element={<Layout><AdminUsersPage /></Layout>} />
+            <Route path="/admin/salons" element={<Layout><SalonApprovalsPage /></Layout>} />
           </Routes>
         </Router>
       </ThemeProvider>

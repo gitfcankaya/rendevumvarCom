@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { mockAuthService } from '../../services/mockAuthService';
+import { authService } from '../../services/authService';
 
 interface User {
   id: string;
@@ -8,55 +8,34 @@ interface User {
   lastName: string;
   role: string;
   tenantId?: string;
+  salonId?: string;
+  staffId?: string;
 }
 
 interface AuthState {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
   isLoading: boolean;
   error: string | null;
   isAuthenticated: boolean;
 }
 
 const initialState: AuthState = {
-  user: null,
-  token: localStorage.getItem('token'),
+  user: authService.getCurrentUser(),
+  token: authService.getToken(),
+  refreshToken: authService.getRefreshToken(),
   isLoading: false,
   error: null,
-  isAuthenticated: !!localStorage.getItem('token'),
+  isAuthenticated: authService.isAuthenticated(),
 };
 
 export const login = createAsyncThunk(
   'auth/login',
   async (credentials: { email: string; password: string }, { rejectWithValue }) => {
     try {
-      // First try mock service
-      try {
-        const mockResult = await mockAuthService.login(credentials);
-        localStorage.setItem('token', mockResult.token);
-        return {
-          accessToken: mockResult.token,
-          user: mockResult.user
-        };
-      } catch (mockError) {
-        // If mock service fails, try API
-        const response = await fetch('http://localhost:5275/api/auth/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(credentials),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Login failed');
-        }
-
-        const data = await response.json();
-        localStorage.setItem('token', data.accessToken);
-        return data;
-      }
+      const data = await authService.login(credentials.email, credentials.password);
+      return data;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Login failed');
     }
@@ -70,55 +49,49 @@ export const register = createAsyncThunk(
     password: string;
     firstName: string;
     lastName: string;
-    phone?: string;
-    role?: string;
+    phoneNumber: string;
   }, { rejectWithValue }) => {
     try {
-      // First try mock service
-      try {
-        const mockResult = await mockAuthService.register({
-          email: userData.email,
-          password: userData.password,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          role: userData.role || "Customer"
-        });
-        localStorage.setItem('token', mockResult.token);
-        return {
-          accessToken: mockResult.token,
-          user: mockResult.user
-        };
-      } catch (mockError) {
-        // If mock service fails, try API
-        const requestData = {
-          email: userData.email,
-          password: userData.password,
-          confirmPassword: userData.password, // Auto-confirm for now
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          phone: userData.phone || "",
-          role: userData.role || "Customer" // Default role
-        };
-
-        const response = await fetch('http://localhost:5275/api/auth/register', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestData),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Registration failed');
-        }
-
-        const data = await response.json();
-        localStorage.setItem('token', data.accessToken);
-        return data;
-      }
+      const data = await authService.register(userData);
+      return data;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Registration failed');
+    }
+  }
+);
+
+export const refreshToken = createAsyncThunk(
+  'auth/refreshToken',
+  async (_, { rejectWithValue }) => {
+    try {
+      const newToken = await authService.refreshToken();
+      return { token: newToken };
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Token refresh failed');
+    }
+  }
+);
+
+export const forgotPassword = createAsyncThunk(
+  'auth/forgotPassword',
+  async (email: string, { rejectWithValue }) => {
+    try {
+      await authService.forgotPassword(email);
+      return { message: 'Password reset email sent' };
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to send password reset email');
+    }
+  }
+);
+
+export const resetPassword = createAsyncThunk(
+  'auth/resetPassword',
+  async ({ token, newPassword }: { token: string; newPassword: string }, { rejectWithValue }) => {
+    try {
+      await authService.resetPassword(token, newPassword);
+      return { message: 'Password reset successful' };
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Password reset failed');
     }
   }
 );
@@ -128,14 +101,19 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     logout: (state) => {
-      localStorage.removeItem('token');
+      authService.logout();
       state.user = null;
       state.token = null;
+      state.refreshToken = null;
       state.isAuthenticated = false;
       state.error = null;
     },
     clearError: (state) => {
       state.error = null;
+    },
+    setUser: (state, action) => {
+      state.user = action.payload;
+      state.isAuthenticated = true;
     },
   },
   extraReducers: (builder) => {
@@ -148,7 +126,8 @@ const authSlice = createSlice({
       .addCase(login.fulfilled, (state, action) => {
         state.isLoading = false;
         state.user = action.payload.user;
-        state.token = action.payload.accessToken;
+        state.token = action.payload.token;
+        state.refreshToken = action.payload.refreshToken;
         state.isAuthenticated = true;
         state.error = null;
       })
@@ -165,7 +144,8 @@ const authSlice = createSlice({
       .addCase(register.fulfilled, (state, action) => {
         state.isLoading = false;
         state.user = action.payload.user;
-        state.token = action.payload.accessToken;
+        state.token = action.payload.token;
+        state.refreshToken = action.payload.refreshToken;
         state.isAuthenticated = true;
         state.error = null;
       })
@@ -173,9 +153,46 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
         state.isAuthenticated = false;
+      })
+      // Refresh Token
+      .addCase(refreshToken.fulfilled, (state, action) => {
+        state.token = action.payload.token;
+      })
+      .addCase(refreshToken.rejected, (state) => {
+        authService.logout();
+        state.user = null;
+        state.token = null;
+        state.refreshToken = null;
+        state.isAuthenticated = false;
+      })
+      // Forgot Password
+      .addCase(forgotPassword.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(forgotPassword.fulfilled, (state) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(forgotPassword.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      // Reset Password
+      .addCase(resetPassword.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(resetPassword.fulfilled, (state) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(resetPassword.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
       });
   },
 });
 
-export const { logout, clearError } = authSlice.actions;
+export const { logout, clearError, setUser } = authSlice.actions;
 export default authSlice.reducer;

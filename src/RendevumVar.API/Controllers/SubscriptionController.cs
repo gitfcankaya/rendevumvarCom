@@ -299,7 +299,7 @@ public class SubscriptionController : ControllerBase
     }
 
     [HttpPost("process-payment")]
-    public async Task<ActionResult<PaymentDto>> ProcessPayment(CreatePaymentDto dto)
+    public async Task<ActionResult<PaymentDto>> ProcessPayment(CreateSubscriptionPaymentDto dto)
     {
         // Simulate PayTR payment processing
         var payment = new Payment

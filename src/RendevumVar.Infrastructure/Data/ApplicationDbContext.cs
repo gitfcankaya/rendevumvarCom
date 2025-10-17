@@ -25,12 +25,12 @@ public class ApplicationDbContext : DbContext
     public DbSet<ContentPage> ContentPages { get; set; }
     public DbSet<SubscriptionPlan> SubscriptionPlans { get; set; }
     public DbSet<Subscription> Subscriptions { get; set; }
-    
+
     // Phase 2: Advanced Features
     public DbSet<TenantSubscription> TenantSubscriptions { get; set; }
     public DbSet<Invoice> Invoices { get; set; }
     public DbSet<InvoiceLineItem> InvoiceLineItems { get; set; }
-    
+
     // Phase 2: Staff Management
     public DbSet<Role> Roles { get; set; }
     public DbSet<StaffSchedule> StaffSchedules { get; set; }
@@ -49,6 +49,12 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => e.Subdomain).IsUnique();
             entity.Property(e => e.SubscriptionPlan).HasMaxLength(50);
             entity.Property(e => e.Status).HasMaxLength(20);
+
+            // Configure Owner relationship
+            entity.HasOne(e => e.Owner)
+                .WithMany()
+                .HasForeignKey(e => e.OwnerId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // User Configuration
@@ -181,7 +187,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.InvitationToken).HasMaxLength(500);
             entity.Property(e => e.HourlyRate).HasPrecision(18, 2);
             entity.Property(e => e.CommissionRate).HasPrecision(5, 2);
-            
+
             entity.HasIndex(e => e.TenantId);
             entity.HasIndex(e => e.SalonId);
             entity.HasIndex(e => e.UserId);
@@ -203,7 +209,7 @@ public class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
-            
+
             entity.HasOne(e => e.Role)
                 .WithMany(r => r.StaffMembers)
                 .HasForeignKey(e => e.RoleId)
@@ -320,7 +326,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.ImageUrl).HasMaxLength(500);
             entity.Property(e => e.ButtonText).HasMaxLength(100);
             entity.Property(e => e.ButtonUrl).HasMaxLength(500);
-            
+
             entity.HasIndex(e => e.Slug).IsUnique();
             entity.HasIndex(e => e.IsActive);
             entity.HasIndex(e => e.SortOrder);
@@ -337,7 +343,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Features).HasColumnType("nvarchar(max)");
             entity.Property(e => e.Badge).HasMaxLength(50);
             entity.Property(e => e.Color).HasMaxLength(20);
-            
+
             entity.HasIndex(e => e.IsActive);
             entity.HasIndex(e => e.SortOrder);
         });
@@ -348,17 +354,17 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.AmountPaid).HasPrecision(18, 2);
             entity.Property(e => e.CancellationReason).HasMaxLength(500);
-            
+
             entity.HasOne(e => e.User)
                 .WithMany(u => u.Subscriptions)
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
-                
+
             entity.HasOne(e => e.SubscriptionPlan)
                 .WithMany(sp => sp.Subscriptions)
                 .HasForeignKey(e => e.SubscriptionPlanId)
                 .OnDelete(DeleteBehavior.Restrict);
-            
+
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.StartDate);
@@ -387,7 +393,7 @@ public class ApplicationDbContext : DbContext
                 .WithMany(a => a.Payments)
                 .HasForeignKey(e => e.AppointmentId)
                 .OnDelete(DeleteBehavior.SetNull);
-                
+
             entity.HasOne(e => e.Subscription)
                 .WithMany(s => s.Payments)
                 .HasForeignKey(e => e.SubscriptionId)
@@ -405,17 +411,17 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.PaymentMethodId).HasMaxLength(100);
             entity.Property(e => e.CancellationReason).HasMaxLength(500);
-            
+
             entity.HasOne(e => e.Tenant)
                 .WithMany()
                 .HasForeignKey(e => e.TenantId)
                 .OnDelete(DeleteBehavior.Restrict);
-            
+
             entity.HasOne(e => e.SubscriptionPlan)
                 .WithMany(sp => sp.TenantSubscriptions)
                 .HasForeignKey(e => e.SubscriptionPlanId)
                 .OnDelete(DeleteBehavior.Restrict);
-            
+
             entity.HasIndex(e => e.TenantId);
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.NextBillingDate);
@@ -433,17 +439,17 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Currency).HasMaxLength(3).HasDefaultValue("TRY");
             entity.Property(e => e.PaymentTransactionId).HasMaxLength(100);
             entity.Property(e => e.PdfUrl).HasMaxLength(500);
-            
+
             entity.HasOne(e => e.Tenant)
                 .WithMany()
                 .HasForeignKey(e => e.TenantId)
                 .OnDelete(DeleteBehavior.Restrict);
-            
+
             entity.HasOne(e => e.TenantSubscription)
                 .WithMany(ts => ts.Invoices)
                 .HasForeignKey(e => e.TenantSubscriptionId)
                 .OnDelete(DeleteBehavior.SetNull);
-            
+
             entity.HasIndex(e => e.TenantId);
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.InvoiceDate);
@@ -457,12 +463,12 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Description).IsRequired().HasMaxLength(500);
             entity.Property(e => e.UnitPrice).HasPrecision(18, 2);
             entity.Property(e => e.LineTotal).HasPrecision(18, 2);
-            
+
             entity.HasOne(e => e.Invoice)
                 .WithMany(i => i.LineItems)
                 .HasForeignKey(e => e.InvoiceId)
                 .OnDelete(DeleteBehavior.Cascade);
-            
+
             entity.HasIndex(e => e.InvoiceId);
         });
 
@@ -473,12 +479,12 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.Permissions).IsRequired().HasColumnType("nvarchar(max)");
-            
+
             entity.HasOne(e => e.Tenant)
                 .WithMany()
                 .HasForeignKey(e => e.TenantId)
                 .OnDelete(DeleteBehavior.Restrict);
-            
+
             entity.HasIndex(e => new { e.TenantId, e.Name }).IsUnique();
         });
 
@@ -486,12 +492,12 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<StaffSchedule>(entity =>
         {
             entity.HasKey(e => e.Id);
-            
+
             entity.HasOne(e => e.Staff)
                 .WithMany(s => s.Schedules)
                 .HasForeignKey(e => e.StaffId)
                 .OnDelete(DeleteBehavior.Cascade);
-            
+
             entity.HasIndex(e => e.StaffId);
             entity.HasIndex(e => new { e.StaffId, e.DayOfWeek });
         });
@@ -502,17 +508,17 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Reason).HasMaxLength(1000);
             entity.Property(e => e.RejectionReason).HasMaxLength(500);
-            
+
             entity.HasOne(e => e.Staff)
                 .WithMany(s => s.TimeOffRequests)
                 .HasForeignKey(e => e.StaffId)
                 .OnDelete(DeleteBehavior.Cascade);
-            
+
             entity.HasOne(e => e.Tenant)
                 .WithMany()
                 .HasForeignKey(e => e.TenantId)
                 .OnDelete(DeleteBehavior.Restrict);
-            
+
             entity.HasIndex(e => e.StaffId);
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => new { e.StartDate, e.EndDate });

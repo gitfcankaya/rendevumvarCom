@@ -1,3 +1,5 @@
+using RendevumVar.Core.Enums;
+
 namespace RendevumVar.Core.Entities;
 
 public class Salon : BaseEntity
@@ -18,6 +20,12 @@ public class Salon : BaseEntity
     public decimal AverageRating { get; set; } = 0;
     public int ReviewCount { get; set; } = 0;
     public bool IsActive { get; set; } = true;
+
+    // Approval fields
+    public SalonStatus Status { get; set; } = SalonStatus.Pending;
+    public DateTime? ApprovedAt { get; set; }
+    public Guid? ApprovedBy { get; set; }
+    public string? RejectionReason { get; set; }
 
     // Navigation properties
     public Tenant Tenant { get; set; } = null!;

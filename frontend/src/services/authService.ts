@@ -1,3 +1,5 @@
+import apiClient from './apiClient';
+
 interface User {
   id: string;
   email: string;
@@ -21,20 +23,12 @@ const USER_KEY = 'current_user';
 
 class AuthService {
   async login(email: string, password: string): Promise<LoginResponse> {
-    const response = await fetch('http://localhost:5000/api/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, password }),
+    const response = await apiClient.post<LoginResponse>('/api/auth/login', {
+      email,
+      password,
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Login failed');
-    }
-
-    const data: LoginResponse = await response.json();
+    const data = response.data;
     
     // Store tokens and user info
     localStorage.setItem(TOKEN_KEY, data.token);
@@ -51,20 +45,9 @@ class AuthService {
     lastName: string;
     phoneNumber: string;
   }): Promise<LoginResponse> {
-    const response = await fetch('http://localhost:5000/api/auth/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(userData),
-    });
+    const response = await apiClient.post<LoginResponse>('/api/auth/register', userData);
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Registration failed');
-    }
-
-    const data: LoginResponse = await response.json();
+    const data = response.data;
     
     // Store tokens and user info
     localStorage.setItem(TOKEN_KEY, data.token);
@@ -109,24 +92,23 @@ class AuthService {
       throw new Error('No refresh token available');
     }
 
-    const response = await fetch('http://localhost:5000/api/auth/refresh', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ refreshToken }),
+    const response = await apiClient.post<{ token: string; refreshToken: string }>('/api/auth/refresh', {
+      refreshToken,
     });
 
-    if (!response.ok) {
-      this.logout();
-      throw new Error('Token refresh failed');
-    }
-
-    const data = await response.json();
+    const data = response.data;
     localStorage.setItem(TOKEN_KEY, data.token);
     localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
 
     return data.token;
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    await apiClient.post('/api/auth/forgot-password', { email });
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    await apiClient.post('/api/auth/reset-password', { token, newPassword });
   }
 }
 

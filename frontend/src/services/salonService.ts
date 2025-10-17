@@ -1,31 +1,4 @@
-import axios from 'axios';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
-// Get auth token from localStorage
-const getAuthToken = (): string | null => {
-  return localStorage.getItem('accessToken');
-};
-
-// Create axios instance with auth interceptor
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Request interceptor to add auth token
-api.interceptors.request.use(
-  (config) => {
-    const token = getAuthToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+import apiClient from './apiClient';
 
 export interface SearchSalonDto {
   searchTerm?: string;
@@ -144,57 +117,57 @@ export interface UpdateBusinessHoursDto {
 const salonService = {
   // Public endpoints
   searchSalons: async (params: SearchSalonDto): Promise<SalonSearchResultDto> => {
-    const response = await api.get('/salons/search', { params });
+    const response = await apiClient.get('/salons/search', { params });
     return response.data;
   },
 
   getSalonDetails: async (id: string): Promise<SalonDetailsDto> => {
-    const response = await api.get(`/salons/${id}`);
+    const response = await apiClient.get(`/salons/${id}`);
     return response.data;
   },
 
   // Authenticated endpoints
   getMySalons: async (): Promise<SalonDto[]> => {
-    const response = await api.get('/salons');
+    const response = await apiClient.get('/salons');
     return response.data;
   },
 
   createSalon: async (dto: CreateSalonDto): Promise<SalonDto> => {
-    const response = await api.post('/salons', dto);
+    const response = await apiClient.post('/salons', dto);
     return response.data;
   },
 
   updateSalon: async (id: string, dto: UpdateSalonDto): Promise<SalonDto> => {
-    const response = await api.put(`/salons/${id}`, dto);
+    const response = await apiClient.put(`/salons/${id}`, dto);
     return response.data;
   },
 
   deleteSalon: async (id: string): Promise<void> => {
-    await api.delete(`/salons/${id}`);
+    await apiClient.delete(`/salons/${id}`);
   },
 
   uploadSalonImage: async (salonId: string, dto: UploadImageDto): Promise<SalonImageDto> => {
-    const response = await api.post(`/salons/${salonId}/images`, dto);
+    const response = await apiClient.post(`/salons/${salonId}/images`, dto);
     return response.data;
   },
 
   deleteSalonImage: async (imageId: string): Promise<void> => {
-    await api.delete(`/salons/images/${imageId}`);
+    await apiClient.delete(`/salons/images/${imageId}`);
   },
 
   updateBusinessHours: async (salonId: string, dto: UpdateBusinessHoursDto): Promise<void> => {
-    await api.put(`/salons/${salonId}/business-hours`, dto);
+    await apiClient.put(`/salons/${salonId}/business-hours`, dto);
   },
 
   // Service-related endpoints
   getSalonServices: async (salonId: string): Promise<ServiceDto[]> => {
-    const response = await api.get(`/services/salon/${salonId}`);
+    const response = await apiClient.get(`/services/salon/${salonId}`);
     return response.data;
   },
 
   // Staff-related endpoints
   getSalonStaff: async (salonId: string): Promise<StaffDto[]> => {
-    const response = await api.get(`/staff/salon/${salonId}`);
+    const response = await apiClient.get(`/staff/salon/${salonId}`);
     return response.data;
   },
 };

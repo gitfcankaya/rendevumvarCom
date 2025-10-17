@@ -4,13 +4,16 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using RendevumVar.Infrastructure.Data;
 using RendevumVar.Infrastructure.Data.Seeders;
+using RendevumVar.Infrastructure.Repositories;
 using RendevumVar.Application.Interfaces;
 using RendevumVar.Application.Services;
+using RendevumVar.Core.Repositories;
 using RendevumVar.API.Middleware;
 using RendevumVar.API.Authorization;
 using RendevumVar.Core.Constants;
 using RendevumVar.Core.Configuration;
 using Serilog;
+using AspNetCoreRateLimit;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +26,13 @@ builder.Host.UseSerilog();
 
 // Add services to the container
 builder.Services.AddControllers();
+
+// Configure Rate Limiting
+builder.Services.AddMemoryCache();
+builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
+builder.Services.Configure<IpRateLimitPolicies>(builder.Configuration.GetSection("IpRateLimitPolicies"));
+builder.Services.AddInMemoryRateLimiting();
+builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
 
 // Configure options
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
@@ -72,6 +82,31 @@ builder.Services.AddScoped<RendevumVar.Application.Interfaces.IImageService, Ren
 builder.Services.AddScoped<RendevumVar.Application.Interfaces.IAppointmentService, RendevumVar.Application.Services.AppointmentService>();
 builder.Services.AddScoped<RendevumVar.Application.Interfaces.IAvailabilityService, RendevumVar.Application.Services.AvailabilityService>();
 builder.Services.AddScoped<RendevumVar.Application.Interfaces.INotificationService, RendevumVar.Application.Services.NotificationService>();
+
+// Phase 5: Review & Ratings Services
+builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
+builder.Services.AddScoped<IReviewService, ReviewService>();
+
+// Phase 10: Payment Services
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
+// Configure payment gateway (FakePOS by default, can be changed to PayTR in production)
+var paymentConfig = builder.Configuration.GetSection("PaymentConfiguration").Get<PaymentConfiguration>();
+if (paymentConfig?.DefaultGateway == "PayTR")
+{
+    builder.Services.AddScoped<IPaymentGateway, PayTRGateway>();
+    builder.Services.Configure<PayTRConfiguration>(builder.Configuration.GetSection("PayTRConfiguration"));
+}
+else
+{
+    builder.Services.AddScoped<IPaymentGateway, FakePaymentGateway>();
+}
+builder.Services.Configure<PaymentConfiguration>(builder.Configuration.GetSection("PaymentConfiguration"));
+builder.Services.AddHttpClient("PayTR");
+
+// Phase 11: Analytics Services
+builder.Services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
+builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
 
 // Background Jobs
 builder.Services.AddHostedService<RendevumVar.API.BackgroundJobs.AppointmentReminderJob>();
@@ -188,6 +223,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("AllowFrontend");
 
+// Use IP Rate Limiting
+app.UseIpRateLimiting();
+
 // Test database connection
 using (var scope = app.Services.CreateScope())
 {
@@ -197,6 +235,10 @@ using (var scope = app.Services.CreateScope())
         await context.Database.CanConnectAsync();
         app.Logger.LogInformation("Database connection successful");
         app.Logger.LogInformation("Database setup completed");
+
+        // Seed development data
+        await RendevumVar.Infrastructure.Data.Seeders.DataSeeder.SeedAsync(context);
+        app.Logger.LogInformation("Development seed data created");
     }
     catch (Exception ex)
     {
@@ -206,6 +248,9 @@ using (var scope = app.Services.CreateScope())
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Use tenant resolution middleware after authentication
+app.UseTenantResolution();
 
 // Use subscription enforcement middleware after authentication
 app.UseSubscriptionEnforcement();

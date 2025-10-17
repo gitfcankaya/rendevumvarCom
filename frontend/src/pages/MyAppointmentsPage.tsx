@@ -6,6 +6,9 @@ import {
   type AppointmentDetailsDto,
   AppointmentStatus,
 } from '../services/appointmentService';
+import { reviewService } from '../services/reviewService';
+import { ReviewFormDialog } from '../components/review';
+import type { CreateReviewDto } from '../types/review';
 
 type TabType = 'upcoming' | 'past';
 
@@ -29,6 +32,7 @@ const MyAppointmentsPage: React.FC = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [showReviewDialog, setShowReviewDialog] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [rescheduleTime, setRescheduleTime] = useState('');
@@ -146,6 +150,23 @@ const MyAppointmentsPage: React.FC = () => {
       console.error('Error cancelling appointment:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleWriteReview = async (appointment: AppointmentDto) => {
+    setSelectedAppointment(appointment as any);
+    setShowReviewDialog(true);
+  };
+
+  const handleSubmitReview = async (dto: CreateReviewDto) => {
+    try {
+      await reviewService.createReview(dto);
+      setShowReviewDialog(false);
+      setSelectedAppointment(null);
+      await loadAppointments(); // Reload to reflect review status
+    } catch (err) {
+      console.error('Error submitting review:', err);
+      setError('Değerlendirme gönderilemedi.');
     }
   };
 
@@ -454,6 +475,14 @@ const MyAppointmentsPage: React.FC = () => {
                       >
                         Detaylar
                       </button>
+                      {appointment.status === AppointmentStatus.Completed && (
+                        <button
+                          onClick={() => handleWriteReview(appointment)}
+                          className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm font-medium"
+                        >
+                          ⭐ Değerlendir
+                        </button>
+                      )}
                       {canReschedule(appointment) && (
                         <button
                           onClick={() => handleRescheduleClick(appointment)}
@@ -724,6 +753,23 @@ const MyAppointmentsPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Review Dialog */}
+      {selectedAppointment && showReviewDialog && (
+        <ReviewFormDialog
+          open={showReviewDialog}
+          onClose={() => {
+            setShowReviewDialog(false);
+            setSelectedAppointment(null);
+          }}
+          onSubmit={handleSubmitReview}
+          appointmentId={selectedAppointment.id}
+          salonId={selectedAppointment.salonId}
+          staffId={selectedAppointment.staffId}
+          salonName={selectedAppointment.salonName}
+          staffName={selectedAppointment.staffName}
+        />
       )}
     </div>
   );

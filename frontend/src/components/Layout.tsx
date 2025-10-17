@@ -27,7 +27,9 @@ import {
   Build,
   Settings,
   ExitToApp,
-  Person
+  Person,
+  SupervisorAccount,
+  Store
 } from '@mui/icons-material';
 
 interface LayoutProps {
@@ -73,6 +75,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { text: 'Hizmetler', icon: <Build />, path: '/services' },
   ];
 
+  // Admin menu items - shown only for Admin users
+  const adminMenuItems = [
+    { text: 'Kullanıcı Yönetimi', icon: <SupervisorAccount />, path: '/admin/users' },
+    { text: 'Salon Onayları', icon: <Store />, path: '/admin/salons' },
+  ];
+
   const isActivePath = (path: string) => location.pathname === path;
 
   const drawerContent = (
@@ -111,6 +119,39 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               }}
             >
               <ListItemIcon>{item.icon}</ListItemIcon>
+              <ListItemText primary={item.text} />
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
+
+      {/* Admin Section - TODO: Add role check */}
+      <Divider sx={{ my: 1 }} />
+      <Box sx={{ px: 2, py: 1 }}>
+        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+          YÖNETİM
+        </Typography>
+      </Box>
+      <List>
+        {adminMenuItems.map((item) => (
+          <ListItem key={item.text} disablePadding>
+            <ListItemButton
+              onClick={() => navigate(item.path)}
+              selected={isActivePath(item.path)}
+              sx={{
+                '&.Mui-selected': {
+                  backgroundColor: 'error.light',
+                  '& .MuiListItemIcon-root': {
+                    color: 'error.main',
+                  },
+                  '& .MuiListItemText-primary': {
+                    color: 'error.main',
+                    fontWeight: 600,
+                  },
+                },
+              }}
+            >
+              <ListItemIcon sx={{ color: 'error.main' }}>{item.icon}</ListItemIcon>
               <ListItemText primary={item.text} />
             </ListItemButton>
           </ListItem>

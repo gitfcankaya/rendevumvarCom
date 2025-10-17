@@ -1,6 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import salonService, { type SalonDetailsDto, type ServiceDto } from '../services/salonService';
+import { Box, Container, Tabs, Tab } from '@mui/material';
+import salonService, { type SalonDetailsDto } from '../services/salonService';
+import { reviewService } from '../services/reviewService';
+import { RatingDisplay, RatingDistribution, ReviewList } from '../components/review';
+import type { Review, SalonRating } from '../types/review';
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`salon-tabpanel-${index}`}
+      aria-labelledby={`salon-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
+    </div>
+  );
+}
 
 const SalonProfilePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -8,10 +33,16 @@ const SalonProfilePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [tabValue, setTabValue] = useState(0);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [salonRating, setSalonRating] = useState<SalonRating | null>(null);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
 
   useEffect(() => {
     if (id) {
       fetchSalonDetails();
+      fetchReviews();
+      fetchSalonRating();
     }
   }, [id]);
 
@@ -26,6 +57,27 @@ const SalonProfilePage: React.FC = () => {
       console.error('Error fetching salon details:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReviews = async () => {
+    try {
+      setReviewsLoading(true);
+      const data = await reviewService.getReviewsBySalon(id!, false);
+      setReviews(data);
+    } catch (err) {
+      console.error('Error fetching reviews:', err);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  const fetchSalonRating = async () => {
+    try {
+      const data = await reviewService.getSalonRating(id!);
+      setSalonRating(data);
+    } catch (err) {
+      console.error('Error fetching salon rating:', err);
     }
   };
 
@@ -244,6 +296,40 @@ const SalonProfilePage: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Reviews Section */}
+            <div className="mt-8 pt-8 border-t border-gray-200">
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">Değerlendirmeler</h2>
+                {salonRating && (
+                  <RatingDisplay
+                    value={salonRating.averageRating}
+                    totalReviews={salonRating.totalReviews}
+                    size="large"
+                  />
+                )}
+              </div>
+
+              <Box sx={{ width: '100%' }}>
+                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                  <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)}>
+                    <Tab label={`Yorumlar (${reviews.length})`} />
+                    <Tab label="Rating Dağılımı" />
+                  </Tabs>
+                </Box>
+                
+                <TabPanel value={tabValue} index={0}>
+                  <ReviewList
+                    reviews={reviews}
+                    loading={reviewsLoading}
+                  />
+                </TabPanel>
+                
+                <TabPanel value={tabValue} index={1}>
+                  {salonRating && <RatingDistribution rating={salonRating} />}
+                </TabPanel>
+              </Box>
+            </div>
           </div>
         </div>
       </div>

@@ -10,6 +10,8 @@ import salonService, {
   type ServiceDto,
   type StaffDto,
 } from '../services/salonService';
+import PaymentFormDialog from '../components/PaymentFormDialog';
+import paymentService, { type CreatePaymentDto } from '../services/paymentService';
 
 interface BookingFormData {
   salonId: string;
@@ -50,6 +52,11 @@ const BookAppointmentPage: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  
+  // Payment state
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [createdAppointmentId, setCreatedAppointmentId] = useState<string>('');
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   // Step 1: Load salons if not pre-selected
   useEffect(() => {
@@ -250,14 +257,51 @@ const BookAppointmentPage: React.FC = () => {
         customerNotes: formData.customerNotes,
       };
 
-      await appointmentService.createAppointment(appointmentData);
-      setShowSuccessModal(true);
+      const createdAppointment = await appointmentService.createAppointment(appointmentData);
+      
+      // Store appointment ID and show payment dialog
+      setCreatedAppointmentId(createdAppointment.id);
+      setShowPaymentDialog(true);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Randevu oluşturulamadı. Lütfen tekrar deneyin.');
       console.error('Error creating appointment:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePaymentSubmit = async (paymentData: CreatePaymentDto) => {
+    try {
+      setPaymentLoading(true);
+      
+      const result = await paymentService.createPayment(paymentData);
+      
+      if (result.status === 'Completed') {
+        // Payment successful
+        setShowPaymentDialog(false);
+        setShowSuccessModal(true);
+      } else if (result.paymentUrl) {
+        // Redirect to payment gateway (for PayTR)
+        window.location.href = result.paymentUrl;
+      } else {
+        // Payment failed
+        setError(`Ödeme başarısız: ${result.errorMessage || 'Lütfen tekrar deneyin.'}`);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Ödeme işlemi başarısız oldu.');
+      console.error('Error processing payment:', err);
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  const handlePaymentCancel = () => {
+    setShowPaymentDialog(false);
+    setError('Randevunuz oluşturuldu ancak ödeme yapılmadı. Randevularım sayfasından ödeme yapabilirsiniz.');
+    // Still navigate to appointments page so user can complete payment later
+    setTimeout(() => {
+      navigate('/my-appointments');
+    }, 3000);
   };
 
   const handleSuccessModalClose = () => {
@@ -723,8 +767,8 @@ const BookAppointmentPage: React.FC = () => {
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">Randevunuz Oluşturuldu!</h3>
               <p className="text-sm text-gray-500 mb-6">
-                Randevu detayları e-posta adresinize gönderildi. Randevularım sayfasından tüm randevularınızı
-                görüntüleyebilirsiniz.
+                Ödemeniz başarıyla alındı. Randevu detayları e-posta adresinize gönderildi. 
+                Randevularım sayfasından tüm randevularınızı görüntüleyebilirsiniz.
               </p>
               <div className="flex gap-3">
                 <button
@@ -744,6 +788,16 @@ const BookAppointmentPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Payment Dialog */}
+      <PaymentFormDialog
+        open={showPaymentDialog}
+        onClose={handlePaymentCancel}
+        onSubmit={handlePaymentSubmit}
+        amount={selectedService?.price || 0}
+        currency="TRY"
+        appointmentId={createdAppointmentId}
+      />
     </div>
   );
 };
